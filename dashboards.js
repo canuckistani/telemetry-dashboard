@@ -1,9 +1,4 @@
-$(document).ready(function() {
-  // Select boxes
-  $(".select2").select2({dropdownAutoWidth: true}).each(function(i, select) {
-    $(this).next().css("margin-top", "-0.25em"); // Align the control so that the baseline matches surrounding text
-  });
-  
+$(document).ready(function() {  
   // Multiselect boxes
   $('.multiselect').each(function(i, select) {
     var $this = $(this);
@@ -47,7 +42,7 @@ $(document).ready(function() {
       success: function(response) {
         var longUrl = Object.keys(response.results)[0];
         var shortUrl = response.results[longUrl].shortUrl;
-        $this.parent(".permalink-control").find("input").show().val(shortUrl).focus();
+        $this.parents(".permalink-control").find("input").show().val(shortUrl).focus();
       }
     });
   });
@@ -326,38 +321,13 @@ function deduplicate(values) {
   });
 }
 
-function selectSetOptions(element, options, defaultSelected) {
-  if (defaultSelected !== undefined && typeof defaultSelected !== "string") {
-    throw "Bad defaultSelected value: must be a string.";
-  }
-  options.forEach(function(option) {
-    if (!$.isArray(option) || option.length !== 2 || typeof option[0] !== "string" || typeof option[1] !== "string") {
-      throw "Bad options value: must be array of arrays, each with two strings.";
-    }
-  });
-  var selected = element.val() || defaultSelected;
-  element.empty().append(options.map(function(option) {
-    return '<option value="' + option[0] + '">' + option[1] + '</option>';
-  }).join());
-  if (typeof selected === "string") { element.each(function() { $(this).select2("val", selected); }); }
-  else { element.each(function() { $(this).select2("val", options[0][0]); }); }
-}
-
-function selectSetSelected(element, option) {
-  var options = element.find("option").map(function() { return $(this).val(); }).toArray();
-  if (options.indexOf(option) >= 0) {
-    element.select2("val", option);
-  } else {
-    console.log("BAD OPTION: " + option)
-  }
-}
-
 // Sets the options of a multiselect to a list of pairs where the first element is the value, and the second is the text
 function multiselectSetOptions(element, options, defaultSelected) {
   defaultSelected = defaultSelected || null;
   
   if (options.length === 0) { element.empty().multiselect("rebuild"); return; }
   var selected = element.val() || defaultSelected;
+  if (!$.isArray(selected) && selected !== null) { selected = [selected]; }
   
   // Check inputs
   if (defaultSelected !== null) {

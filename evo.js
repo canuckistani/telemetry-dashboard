@@ -16,16 +16,16 @@ $(function() { Telemetry.init(function() {
 
   // Set up settings selectors
   $("#aggregates").multiselect("select", gInitialPageState.aggregates);
-  selectSetOptions($("#min-channel-version, #max-channel-version"), Telemetry.getVersions().map(function(version) { return [version, version] }));
+  multiselectSetOptions($("#min-channel-version, #max-channel-version"), Telemetry.getVersions().map(function(version) { return [version, version] }));
   
-  if (gInitialPageState.min_channel_version) { selectSetSelected($("#min-channel-version"), gInitialPageState.min_channel_version); }
-  if (gInitialPageState.max_channel_version) { selectSetSelected($("#max-channel-version"), gInitialPageState.max_channel_version); }
+  if (gInitialPageState.min_channel_version) { $("#min-channel-version").multiselect("select", gInitialPageState.min_channel_version); }
+  if (gInitialPageState.max_channel_version) { $("#max-channel-version").multiselect("select", gInitialPageState.max_channel_version); }
   var fromVersion = $("#min-channel-version").val(), toVersion = $("#max-channel-version").val();
   var versions = Telemetry.getVersions(fromVersion, toVersion);
-  if (versions.length === 0) { selectSetSelected($("#min-channel-version"), toVersion); }// Invalid range selected, move min version selector
+  if (versions.length === 0) { $("#min-channel-version").multiselect("select", toVersion); }// Invalid range selected, move min version selector
   
-  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0);
-  $("#sanitize-toggle").prop("checked", gInitialPageState.sanitize !== 0);
+  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0).trigger("change");
+  $("#sanitize-toggle").prop("checked", gInitialPageState.sanitize !== 0).trigger("change");
 
   indicate("Updating filters...");
   updateOptions(function(filterOptions) {
@@ -49,8 +49,8 @@ $(function() { Telemetry.init(function() {
       var fromVersion = $("#min-channel-version").val(), toVersion = $("#max-channel-version").val();
       var versions = Telemetry.getVersions(fromVersion, toVersion);
       if (versions.length === 0) { // Invalid range selected, move other version selector
-        if (e.target.id === "min-channel-version") { selectSetSelected($("#max-channel-version"), fromVersion); }
-        else { selectSetSelected($("#min-channel-version"), toVersion); }
+        if (e.target.id === "min-channel-version") { $("#max-channel-version").multiselect("select", fromVersion); }
+        else { $("#min-channel-version").multiselect("select", toVersion); }
       }
       indicate("Updating versions...");
       updateOptions(function() { $("#measure").trigger("change"); });
@@ -102,8 +102,8 @@ function updateOptions(callback) {
       
       versionCount ++;
       if (versionCount === versions.length) { // All versions are loaded
-        selectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
-        selectSetSelected($("#measure"), gInitialPageState.measure);
+        multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
+        $("#measure").multiselect("select", gInitialPageState.measure);
 
         multiselectSetOptions($("#filter-product"), getHumanReadableOptions("product", deduplicate(optionsMap.application)));
         multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
@@ -115,7 +115,7 @@ function updateOptions(callback) {
     });
   });
   if (versions.length == 0) { // All versions are loaded
-    selectSetOptions($("#measure"), []);
+    mutliselectSetOptions($("#measure"), []);
     if (callback !== undefined) { callback(); }
     return;
   }
@@ -314,7 +314,7 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
     right: 100, bottom: 50, // Extra space on the right and bottom for labels
     target: "#submissions",
     x_extended_ticks: true,
-    x_label: "Build ID", y_label: "Daily Metric Count",
+    x_label: "Build ID", y_label: "Daily Ping Count",
     transition_on_update: false,
     interpolate: "linear",
     markers: markers,
@@ -480,5 +480,4 @@ function saveStateToUrlAndCookie() {
   // Add link to switch to the evolution dashboard with the same settings
   var dashboardURL = window.location.origin + window.location.pathname.replace(/evo\.html$/, "dist.html") + window.location.hash;
   $("#switch-views").attr("href", dashboardURL);
-  $("#tutorial").attr("href", "./tutorial.html" + window.location.hash);
 }

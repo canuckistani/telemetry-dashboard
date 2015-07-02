@@ -16,11 +16,10 @@ $(function() { Telemetry.init(function() {
   gInitialPageState = loadStateFromUrlAndCookie();
   
   // Set up settings selectors
-  selectSetOptions($("#channel-version"), Telemetry.getVersions().map(function(version) { return [version, version.replace("/", " ")] }));
-  if (gInitialPageState.max_channel_version) { $("#channel-version").select2("val", gInitialPageState.max_channel_version); }
-  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0);
+  multiselectSetOptions($("#channel-version"), Telemetry.getVersions().map(function(version) { return [version, version.replace("/", " ")] }));
+  if (gInitialPageState.max_channel_version) { $("#channel-version").multiselect("select", gInitialPageState.max_channel_version); }
+  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0).trigger("change");
   
-  indicate("Updating filters...");
   updateOptions(function() {
     $("#filter-product").multiselect("select", gInitialPageState.product);
     if (gInitialPageState.os !== null) { $("#filter-os").multiselect("select", gInitialPageState.os); }
@@ -39,7 +38,6 @@ $(function() { Telemetry.init(function() {
     }
     
     $("#channel-version").change(function() {
-      indicate("Updating version...");
       updateOptions(function() { $("#measure").trigger("change"); });
     });
     $("#build-time-toggle, #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type").change(function() {
@@ -87,16 +85,16 @@ $(function() { Telemetry.init(function() {
 function updateOptions(callback) {
   var channelVersion = $("#channel-version").val();
   var parts = channelVersion.split("/"); //wip: clean this up
+  indicate("Updating options...");
   Telemetry.getFilterOptions(parts[0], parts[1], function(optionsMap) {
-    selectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
-    selectSetSelected($("#measure"), gInitialPageState.measure);
-
+    multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
+    $("#measure").multiselect("select", gInitialPageState.measure);
     multiselectSetOptions($("#filter-product"), getHumanReadableOptions("product", deduplicate(optionsMap.application)));
     multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
     multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("arch", deduplicate(optionsMap.architecture)));
     multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10s", deduplicate(optionsMap.e10sEnabled)));
     multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("processType", deduplicate(optionsMap.child)));
-    if (callback !== undefined) { callback(); }
+    if (callback !== undefined) { indicate(); callback(); }
   });
 }
 
@@ -392,5 +390,4 @@ function saveStateToUrlAndCookie() {
   // Add link to switch to the evolution dashboard with the same settings
   var dashboardURL = window.location.origin + window.location.pathname.replace(/dist\.html$/, "evo.html") + window.location.hash;
   $("#switch-views").attr("href", dashboardURL);
-  $("#tutorial").attr("href", "./tutorial.html" + window.location.hash);
 }
