@@ -158,7 +158,7 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
     dates = evolution.dates().filter(function(date) { return date <= timeCutoff; }); // Cut off all dates past one year in the future
   }
   if (dates.length === 0) {
-    if (evolution.dates().length === 0) {
+    if (evolution === null || evolution.dates().length === 0) {
       $("#date-range").prop("disabled", true);
       $("#range-bar").hide();
     }
