@@ -16,7 +16,7 @@ $(function() { Telemetry.init(function() {
 
   // Set up settings selectors
   $("#aggregates").multiselect("select", gInitialPageState.aggregates);
-  multiselectSetOptions($("#min-channel-version, #max-channel-version"), Telemetry.getVersions().map(function(version) { return [version, version] }));
+  multiselectSetOptions($("#min-channel-version, #max-channel-version"), getHumanReadableOptions("channelVersion", Telemetry.getVersions()));
   
   if (gInitialPageState.min_channel_version) { $("#min-channel-version").multiselect("select", gInitialPageState.min_channel_version); }
   if (gInitialPageState.max_channel_version) { $("#max-channel-version").multiselect("select", gInitialPageState.max_channel_version); }
@@ -24,8 +24,8 @@ $(function() { Telemetry.init(function() {
   var versions = Telemetry.getVersions(fromVersion, toVersion);
   if (versions.length === 0) { $("#min-channel-version").multiselect("select", toVersion); }// Invalid range selected, move min version selector
   
-  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0).trigger("change");
-  $("#sanitize-toggle").prop("checked", gInitialPageState.sanitize !== 0).trigger("change");
+  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
 
   indicate("Updating filters...");
   updateOptions(function(filterOptions) {
@@ -55,7 +55,7 @@ $(function() { Telemetry.init(function() {
       indicate("Updating versions...");
       updateOptions(function() { $("#measure").trigger("change"); });
     });
-    $("#build-time-toggle, #sanitize-toggle, #aggregates, #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type").change(function(e) {
+    $("input[name=build-time-toggle], input[name=sanitize-toggle], #aggregates, #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type").change(function(e) {
       var $this = $(this);
       if (gFilterChangeTimeout !== null) { clearTimeout(gFilterChangeTimeout); }
       gFilterChangeTimeout = setTimeout(function() { // Debounce the changes to prevent rapid filter changes from causing too many updates
@@ -135,7 +135,7 @@ function calculateEvolutions(callback) {
   var evolutionDescription = null;
   channelVersions.forEach(function(channelVersion) {
     var parts = channelVersion.split("/"); //wip: fix this
-    getHistogramEvolutionLines(parts[0], parts[1], measure, aggregates, filterSets, $("#sanitize-toggle").prop("checked"), $("#build-time-toggle").prop("checked"), function(newLines, newSubmissionLines, newDescription) {
+    getHistogramEvolutionLines(parts[0], parts[1], measure, aggregates, filterSets, $("input[name=sanitize-toggle]:checked").val() !== "0", $("input[name=build-time-toggle]:checked").val() !== "0", function(newLines, newSubmissionLines, newDescription) {
       lines = lines.concat(newLines);
       submissionLines = submissionLines.concat(newSubmissionLines);
       evolutionDescription = evolutionDescription || newDescription
@@ -215,6 +215,8 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
 function displayEvolutions(lines, submissionLines, minDate, maxDate) {
   minDate = minDate || null; maxDate = maxDate || null;
 
+  indicate("Rendering evolutions...");
+  
   // filter out empty lines
   lines = lines.filter(function(line) { return line.values.length > 0; });
   submissionLines = submissionLines.filter(function(line) { return line.values.length > 0; });
@@ -239,7 +241,8 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
   var markers = [], usedDates = {};
   lines.forEach(function(line) {
     var minDate = Math.min.apply(Math, line.values.map(function(point) { return point.x; }));
-    usedDates[minDate] = usedDates.hasOwnProperty(minDate) ? usedDates[minDate] + ", " + line.getVersionString() : line.getVersionString();
+    usedDates[minDate] = usedDates[minDate] || [];
+    if (usedDates[minDate].indexOf(line.getVersionString()) < 0) { usedDates[minDate].push(line.getVersionString()); }
   });
   for (var date in usedDates) {
     markers.push({date: new Date(parseInt(date) + 1), label: usedDates[date]}); // Need to add 1ms because the leftmost marker won't show up otherwise
@@ -388,6 +391,8 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
   $(".mg-y-axis .label").attr("y", "10").attr("dy", "0");
   $(".mg-line-legend text").css("font-size", "12px")
   $(".mg-marker-text").css("font-size", "12px").attr("text-anchor", "start").attr("dy", "18").attr("dx", "5");
+  
+  indicate();
 }
 
 var Line = (function(){
@@ -435,20 +440,21 @@ var Line = (function(){
 
 // Save the current state to the URL and the page cookie
 function saveStateToUrlAndCookie() {
-  var startDate = gInitialPageState.start_date, endDate = gInitialPageState.end_date;
+  var startDate = gInitialPageState.start_date, endDate = gInitialPageState.end_date, cumulative = gInitialPageState.cumulative;
   gInitialPageState = {
     aggregates: $("#aggregates").val() || [],
     measure: $("#measure").val(),
     min_channel_version: $("#min-channel-version").val(),
     max_channel_version: $("#max-channel-version").val(),
     product: $("#filter-product").val() || [],
-    use_submission_date: $("#build-time-toggle").prop("checked") ? 1 : 0,
-    sanitize: $("#sanitize-toggle").prop("checked") ? 1 : 0,
+    use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
+    sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
   };
   
   // Save a few unused properties that are used in the distribution dashboard, since state is shared between the two dashboards
   if (startDate !== undefined) { gInitialPageState.start_date = startDate; }
   if (endDate !== undefined) { gInitialPageState.end_date = endDate; }
+  if (cumulative !== undefined) { gInitialPageState.cumulative = cumulative; }
 
   // Only store these in the state if they are not all selected
   var selected = $("#filter-arch").val() || [];
@@ -470,7 +476,7 @@ function saveStateToUrlAndCookie() {
   // Save to the URL hash if it changed
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
-  if (url !== stateString) { window.location.hash = "#" + stateString; }
+  if (url !== stateString) { window.location.replace(window.location.origin + window.location.pathname + "#" + stateString); }
   
   // Save the state in a cookie that expires in 3 days
   var expiry = new Date();

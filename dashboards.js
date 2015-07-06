@@ -5,6 +5,7 @@ $(document).ready(function() {
     var options = {
       enableFiltering: true,
       enableCaseInsensitiveFiltering: true,
+      filterBehavior: "both", // Filter by both the value and the text of the option
       includeSelectAllOption: true,
       allSelectedText: $this.data("all-selected") !== undefined ? $this.data("all-selected") : "Any",
       enableClickableOptGroups: true,
@@ -12,11 +13,22 @@ $(document).ready(function() {
       disableIfEmpty: true,
       nSelectedText: $this.data("n-selected") !== undefined ? $this.data("n-selected") : "selected",
     };
+    if ($this.attr("id") === "measure") { // dirty hack that adds searching by spaces to the measure selector only
+      options.filterBehavior = "custom";
+      options.filterCallback = function(element, query) {
+        var value = $(element).find("label").text().toLowerCase();
+        return value.indexOf(query) >= 0 || value.replace(/_/g, " ").indexOf(query) >= 0;
+      };
+    }
     if ($this.attr("title") !== undefined) {
       options.nonSelectedText = $this.attr("title");
     }
     $this.multiselect(options);
     $this.next().css("margin-top", "-0.25em"); // Align the control so that the baseline matches surrounding text
+  });
+  $(".multiselect-container").scroll(function() { // Make the filter box fixed to the top of the select control
+    var $this = $(this);
+    $this.find(".multiselect-item.filter").css("position", "relative").css("top", $this.scrollTop()).css("z-index", 1);
   });
   
   // Date range pickers
@@ -98,8 +110,8 @@ function loadStateFromUrlAndCookie() {
   
   pageState.use_submission_date = pageState.use_submission_date !== undefined ?
     parseInt(pageState.use_submission_date) : 0;
-  pageState.sanitize = pageState.sanitize !== undefined ?
-    parseInt(pageState.sanitize) : 1;
+  pageState.sanitize = pageState.sanitize !== undefined ? parseInt(pageState.sanitize) : 1;
+  pageState.cumulative = pageState.cumulative !== undefined ? parseInt(pageState.cumulative) : 0;
   pageState.start_date = pageState.start_date !== undefined ? pageState.start_date : null;
   pageState.end_date = pageState.end_date !== undefined ? pageState.end_date : null;
   return pageState;
@@ -172,6 +184,7 @@ function getFilterSets(filters) {
 
 function getHumanReadableOptions(filterName, options) {
   var systemNames = {"Windows_NT": "Windows", "Darwin": "OS X"};
+  var systemOrder = {"Windows_NT": 1, "Darwin": 2};
   var windowsVersionNames = {"5.0": "2000", "5.1": "XP", "5.2": "XP Pro x64", "6.0": "Vista", "6.1": "7", "6.2": "8", "6.3": "8.1", "6.4": "10 (Tech Preview)", "10.0": "10"};
   var windowsVersionOrder = {"5.0": 0, "5.1": 1, "5.2": 2, "6.0": 3, "6.1": 4, "6.2": 5, "6.3": 6, "6.4": 7, "10.0": 8};
   var darwinVersionPrefixes = {
@@ -198,7 +211,7 @@ function getHumanReadableOptions(filterName, options) {
       osEntryMapping["Windows_NT"].sort(function(a, b) {
         // Sort by explicit version order if available
         if (windowsVersionOrder.hasOwnProperty(a) && windowsVersionOrder.hasOwnProperty(b)) {
-          return windowsVersionOrder[a] < windowsVersionOrder[b] ? -1 : (windowsVersionOrder[a] > windowsVersionOrder[b] ? 1 : 0);
+          return windowsVersionOrder[a] - windowsVersionOrder[b];
         } else if (windowsVersionOrder.hasOwnProperty(a)) {
           return -1;
         } else if (windowsVersionOrder.hasOwnProperty(b)) {
@@ -210,7 +223,17 @@ function getHumanReadableOptions(filterName, options) {
     
     // Apply custom version names for OS versions, grouped by OS alphabetically
     var result = [];
-    return [].concat.apply([], Object.keys(osEntryMapping).sort().map(function(os) {
+    return [].concat.apply([], Object.keys(osEntryMapping).sort(function(a, b) {
+      // Sort by explicit version order if available
+      if (systemOrder.hasOwnProperty(a) && systemOrder.hasOwnProperty(b)) {
+        return systemOrder[a] - systemOrder[b];
+      } else if (systemOrder.hasOwnProperty(a)) {
+        return -1;
+      } else if (systemOrder.hasOwnProperty(b)) {
+        return 1;
+      }
+      return ((a < b) ? -1 : ((a > b) ? 1 : 0));
+    }).map(function(os) {
       var entries = osEntryMapping[os];
       return entries.map(function(entry) {
         var versionName = entry.version;
@@ -238,6 +261,12 @@ function getHumanReadableOptions(filterName, options) {
     return options.map(function(option) {
       return [option, processTypeNames.hasOwnProperty(option) ? processTypeNames[option] : option];
     });
+  } else if (filterName === "measure") {
+    // Add a hidden version of the option with spaces instead of underscores, to be able to search with spaces
+    return options.map(function(option) { return [option, option] });
+  } else if (filterName === "channelVersion") {
+    var pattern = /^\w+\/\d+$/;
+    return options.filter(function(option) { return pattern.test(option); }).map(function(option) { return [option, option.replace("/", " ")] });
   }
   return options.map(function(option) { return [option, option] });
 }

@@ -15,6 +15,7 @@
         .dashboard-list .list-group-item { font-size: 18px; }
         .dashboard-list .list-group-item .dashboard-description { font-size: 12px; }
         .big-dashboard-list .list-group-item { font-size: 36px; background: #337AB7; color: white; }
+        .big-dashboard-list .list-group-item:focus { font-size: 36px; background: #337AB7; color: white; }
         .big-dashboard-list .list-group-item:hover { background: #326AA7; color: white; }
         .big-dashboard-list .list-group-item .dashboard-description { font-size: 18px; }
     </style>
@@ -32,16 +33,16 @@
                         Histogram Dashboard <div class="dashboard-description">View measure value distributions as a histogram.</div>
                     </a>
                     <a class="list-group-item" href="evo.html">
-                        Evolution Dashboard <div class="dashboard-description">View the evolution of measure percentiles and aggregates over time.</div>
+                        Evolution Dashboard <div class="dashboard-description">View the evolution of measure percentiles over time.</div>
                     </a>
                 </div>
                 
                 <h3>For power users</h3>
                 <div class="dashboard-list list-group">
-                    <a class="list-group-item" href="http://anthony-zhang.me/telemetry-dashboard/new-design/dist.html">
+                    <a class="list-group-item" href="http://anthony-zhang.me/telemetry-dashboard/dist.html">
                         Histogram Dashboard V4 <span class="label label-warning" style="font-size: 12px">DRAFT</span><div class="dashboard-description">Histogram dashboard running on the unified Telemetry pipeline.</div>
                     </a>
-                    <a class="list-group-item" href="http://anthony-zhang.me/telemetry-dashboard/new-design/evo.html">
+                    <a class="list-group-item" href="http://anthony-zhang.me/telemetry-dashboard/evo.html">
                         Evolution Dashboard V4 <span class="label label-warning" style="font-size: 12px">DRAFT</span><div class="dashboard-description">Evolution dashboard running on the unified Telemetry pipeline.</div>
                     </a>
                     <a class="list-group-item" href="/advanced/">
@@ -55,6 +56,7 @@
             <div class="col-md-4">
                 <h3>Documentation</h3>
                 <ul>
+                    <li><a href="tutorial.html">Dashboard usage tutorial</a></li>
                     <li><a href="docs.html"><code>telemetry.js</code> documentation</a></li>
                     <li><a href="https://github.com/mozilla/telemetry-dashboard">telemetry-dashboard repository</a></li>
                 </ul>

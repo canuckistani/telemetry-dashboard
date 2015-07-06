@@ -16,9 +16,11 @@ $(function() { Telemetry.init(function() {
   gInitialPageState = loadStateFromUrlAndCookie();
   
   // Set up settings selectors
-  multiselectSetOptions($("#channel-version"), Telemetry.getVersions().map(function(version) { return [version, version.replace("/", " ")] }));
+  multiselectSetOptions($("#channel-version"), getHumanReadableOptions("channelVersion", Telemetry.getVersions()));
   if (gInitialPageState.max_channel_version) { $("#channel-version").multiselect("select", gInitialPageState.max_channel_version); }
-  $("#build-time-toggle").prop("checked", gInitialPageState.use_submission_date !== 0).trigger("change");
+  
+  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=cumulative-toggle][value=" + (gInitialPageState.cumulative !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   
   updateOptions(function() {
     $("#filter-product").multiselect("select", gInitialPageState.product);
@@ -40,7 +42,7 @@ $(function() { Telemetry.init(function() {
     $("#channel-version").change(function() {
       updateOptions(function() { $("#measure").trigger("change"); });
     });
-    $("#build-time-toggle, #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type").change(function() {
+    $("input[name=build-time-toggle], #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type").change(function(e) {
       var $this = $(this);
       if (gFilterChangeTimeout !== null) { clearTimeout(gFilterChangeTimeout); }
       gFilterChangeTimeout = setTimeout(function() { // Debounce the changes to prevent rapid filter changes from causing too many updates
@@ -56,7 +58,7 @@ $(function() { Telemetry.init(function() {
         calculateHistogram(function(histogram, evolution) {
           $("#measure-description").text(evolution === null ? $("#measure").val() : evolution.description);
           gCurrentHistogram = histogram; gCurrentEvolution = evolution;
-          displayHistogram(histogram, evolution, $("#cumulative-toggle").prop("checked"));
+          displayHistogram(histogram, evolution, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         });
       }, 0);
@@ -66,8 +68,9 @@ $(function() { Telemetry.init(function() {
     $("#measure").trigger("change");
   });
 
-  $("#cumulative-toggle").change(function() {
-    displayHistogram(gCurrentHistogram, gCurrentEvolution, $("#cumulative-toggle").prop("checked"));
+  $("input[name=cumulative-toggle]").change(function() {
+    displayHistogram(gCurrentHistogram, gCurrentEvolution, $("input[name=cumulative-toggle]:checked").val() !== "0");
+    saveStateToUrlAndCookie();
   });
   
   // Automatically resize range bar
@@ -107,7 +110,7 @@ function calculateHistogram(callback) {
   
   var filtersCount = 0;
   var fullEvolution = null;
-  var useSubmissionDate = $("#build-time-toggle").prop("checked");
+  var useSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0";
   indicate("Updating histogram... 0%");
   filterSets.forEach(function(filterSet) {
     var parts = channelVersion.split("/");
@@ -186,7 +189,6 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
   // First load, update the date picker from the page state
   if (!gLoadedDateRangeFromState && gInitialPageState.start_date !== null && gInitialPageState.end_date !== null) {
     gLoadedDateRangeFromState = true;
-    var picker = $("#date-range").data("daterangepicker");
     var start = moment(gInitialPageState.start_date), end = moment(gInitialPageState.end_date);
     if (start.isValid() && end.isValid()) {
       picker.setStartDate(start); picker.setEndDate(end);
@@ -346,6 +348,7 @@ function saveStateToUrlAndCookie() {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
     product: $("#filter-product").val() || [],
+    cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     start_date: $("#date-range").data("daterangepicker").startDate.format("YYYY-MM-DD"),
     end_date: $("#date-range").data("daterangepicker").endDate.format("YYYY-MM-DD"),
     
@@ -380,7 +383,7 @@ function saveStateToUrlAndCookie() {
   // Save to the URL hash if it changed
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
-  if (url !== stateString) { window.location.hash = "#" + stateString; }
+  if (url !== stateString) { window.location.replace(window.location.origin + window.location.pathname + "#" + stateString); }
   
   // Save the state in a cookie that expires in 3 days
   var expiry = new Date();
