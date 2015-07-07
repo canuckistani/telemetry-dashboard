@@ -282,7 +282,7 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
         lineList = [lines[d.line_id - 1]];
         values = [d.value];
       }
-      var legend = d3.select("#evolutions .mg-active-datapoint").text(moment(date).format("MMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
+      var legend = d3.select("#evolutions .mg-active-datapoint").text(moment(date).format("dddd MMMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
       var lineHeight = 1.1;
       lineList.forEach(function(line, i) {
         var lineIndex = i + 1;
@@ -342,7 +342,7 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
         lineList = [submissionLines[d.line_id - 1]];
         values = [d.value];
       }
-      var legend = d3.select("#submissions .mg-active-datapoint").text(moment(date).format("MMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
+      var legend = d3.select("#submissions .mg-active-datapoint").text(moment(date).format("dddd MMMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
       var lineHeight = 1.1;
       lineList.forEach(function(line, i) {
         var lineIndex = i + 1;
