@@ -194,6 +194,12 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
       picker.setStartDate(start); picker.setEndDate(end);
       gPreviousStartMoment = startMoment; gPreviousEndMoment = endMoment;
     }
+    
+    // If advanced settings are not at their defaults, expand the settings pane on load
+    var fullDates = evolution.dates();
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !start.isSame(fullDates[0]) || !end.isSame(fullDates[fullDates.length - 1])) {
+      $("#advanced-settings-toggle").click();
+    }
   }
   
   // If the selected date range is now out of bounds, or the bounds were updated programmatically and changed, select the entire range
@@ -350,14 +356,13 @@ function saveStateToUrlAndCookie() {
     max_channel_version: $("#channel-version").val(),
     product: $("#filter-product").val() || [],
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
-    start_date: $("#date-range").data("daterangepicker").startDate.format("YYYY-MM-DD"),
-    end_date: $("#date-range").data("daterangepicker").endDate.format("YYYY-MM-DD"),
+    use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
+    start_date: moment(picker.startDate).format("YYYY-MM-DD"),
+    end_date: moment(picker.endDate).format("YYYY-MM-DD"),
     
     // Save a few unused properties that are used in the evolution dashboard, since state is shared between the two dashboards
     min_channel_version: gInitialPageState.min_channel_version !== undefined ?
       gInitialPageState.min_channel_version : "nightly/38",
-    use_submission_date: gInitialPageState.use_submission_date !== undefined ?
-      gInitialPageState.use_submission_date : 0,
     sanitize: gInitialPageState.sanitize !== undefined ?
       gInitialPageState.sanitize : 1,
   };
@@ -406,4 +411,14 @@ function saveStateToUrlAndCookie() {
   gPreviousJSONBlobUrl = URL.createObjectURL(new Blob([jsonValue]));
   $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogram.measure() + ".csv");
   $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistogram.measure() + ".json");
+  
+  // If advanced settings are not at their defaults, display a notice in the panel header
+  var fullDates = gCurrentEvolution.dates();
+  var startMoment = moment(fullDates[0]), endMoment = moment(fullDates[fullDates.length - 1]);
+  var start = moment(gInitialPageState.start_date), end = moment(gInitialPageState.end_date);
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !start.isSame(startMoment) || !end.isSame(endMoment)) {
+    $("#advanced-settings-toggle").find("span").text(" (modified)");
+  } else {
+    $("#advanced-settings-toggle").find("span").text("");
+  }
 }

@@ -27,6 +27,11 @@ $(function() { Telemetry.init(function() {
   $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
 
+  // If advanced settings are not at their defaults, expand the settings pane on load
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.sanitize !== 1) {
+    $("#advanced-settings-toggle").click();
+  }
+
   indicate("Updating filters...");
   updateOptions(function(filterOptions) {
     $("#filter-product").multiselect("select", gInitialPageState.product);
@@ -486,4 +491,11 @@ function saveStateToUrlAndCookie() {
   // Add link to switch to the evolution dashboard with the same settings
   var dashboardURL = window.location.origin + window.location.pathname.replace(/evo\.html$/, "dist.html") + window.location.hash;
   $("#switch-views").attr("href", dashboardURL);
+  
+  // If advanced settings are not at their defaults, display a notice in the panel header
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.sanitize !== 1) {
+    $("#advanced-settings-toggle").find("span").text(" (modified)");
+  } else {
+    $("#advanced-settings-toggle").find("span").text("");
+  }
 }
