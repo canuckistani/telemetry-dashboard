@@ -351,6 +351,7 @@ function displayHistogram(histogram, evolution, cumulative) {
 // Save the current state to the URL and the page cookie
 var gPreviousCSVBlobUrl = null, gPreviousJSONBlobUrl = null;
 function saveStateToUrlAndCookie() {
+  var picker = $("#date-range").data("daterangepicker");
   gInitialPageState = {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
@@ -409,8 +410,8 @@ function saveStateToUrlAndCookie() {
   var jsonValue = JSON.stringify(gCurrentHistogram.map(function(count, start, end, i) { return {start: start, end: end, count: count} }));
   gPreviousCSVBlobUrl = URL.createObjectURL(new Blob([csvValue]));
   gPreviousJSONBlobUrl = URL.createObjectURL(new Blob([jsonValue]));
-  $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogram.measure() + ".csv");
-  $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistogram.measure() + ".json");
+  $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogram.measure + ".csv");
+  $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistogram.measure + ".json");
   
   // If advanced settings are not at their defaults, display a notice in the panel header
   var fullDates = gCurrentEvolution.dates();

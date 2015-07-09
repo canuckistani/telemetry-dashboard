@@ -57,6 +57,24 @@ $(function() { Telemetry.init(function() {
         if (e.target.id === "min-channel-version") { $("#max-channel-version").multiselect("select", fromVersion); }
         else { $("#min-channel-version").multiselect("select", toVersion); }
       }
+      if (fromVersion.split("/")[0] !== toVersion.split("/")[0]) { // Two versions are on different channels, move the other one into the right channel
+        if (e.target.id === "min-channel-version") { // min version changed, change max version to be the largest version in the current channel
+          var channel = fromVersion.split("/")[0];
+          var maxChannelVersion = null;
+          var channelVersions = Telemetry.getVersions().forEach(function(version) {
+            if (version.startsWith(channel + "/")) { maxChannelVersion = version; }
+          });
+          $("#max-channel-version").multiselect("select", maxChannelVersion);
+        } else { // max version changed, change the min version to be the smallest version in the current channel
+          var channel = toVersion.split("/")[0];
+          var minChannelVersion = null;
+          var channelVersions = Telemetry.getVersions().forEach(function(version) {
+            if (minChannelVersion === null && version.startsWith(channel + "/")) { minChannelVersion = version; }
+          });
+          $("#min-channel-version").multiselect("select", minChannelVersion);
+        }
+      }
+
       indicate("Updating versions...");
       updateOptions(function() { $("#measure").trigger("change"); });
     });
@@ -242,6 +260,7 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
   var aggregateMap = {};
   lines.forEach(function(line) { aggregateMap[line.aggregate] = true; });
   var valueLabel = Object.keys(aggregateMap).sort().join(", ") + " " + (lines.length > 0 ? lines[0].measure : "");
+  var variableLabel = useSubmissionDate ? "Submission Date" : "Build ID";
   
   var markers = [], usedDates = {};
   lines.forEach(function(line) {
@@ -262,7 +281,7 @@ function displayEvolutions(lines, submissionLines, minDate, maxDate) {
     right: 100, bottom: 50, // Extra space on the right and bottom for labels
     target: "#evolutions",
     x_extended_ticks: true,
-    x_label: "Build ID", y_label: valueLabel,
+    x_label: variableLabel, y_label: valueLabel,
     transition_on_update: false,
     interpolate: "linear",
     markers: markers, legend: aggregateLabels,

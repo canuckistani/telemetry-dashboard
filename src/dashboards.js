@@ -100,11 +100,11 @@ function loadStateFromUrlAndCookie() {
   });
 
   // Process the saved state value
-  pageState.aggregates = ["median"];
   if (typeof pageState.aggregates === "string") {
     var aggregates = pageState.aggregates.split("!").filter(function(v) { return v in ["5th-percentile", "25th-percentile", "median", "75th-percentile", "95th-percentile", "mean"]; });
     if (aggregates.length > 0) { pageState.aggregates = aggregates; }
-  }
+    else { pageState.aggregates = ["median"]; }
+  } else { pageState.aggregates = ["median"]; }
   pageState.measure = typeof pageState.measure === "string" && pageState.measure !== "" && pageState.measure !== "null" ? pageState.measure : "GC_MS";
   pageState.min_channel_version = typeof pageState.min_channel_version === "string" && pageState.min_channel_version.indexOf("/") >= 0 ?
     pageState.min_channel_version : "nightly/39";
@@ -367,14 +367,17 @@ function multiselectSetOptions(element, options, defaultSelected) {
   defaultSelected = defaultSelected || null;
   
   if (options.length === 0) { element.empty().multiselect("rebuild"); return; }
-  var selected = element.val() || defaultSelected;
-  if (!$.isArray(selected) && selected !== null) { selected = [selected]; }
+  var valuesMap = {}; options.forEach(function(option) { valuesMap[option[0]] = true; });
+  var selected = element.val() || [];
+  if (!$.isArray(selected)) { selected = [selected]; } // For single selects, the value is not wrapped in an array
+  selected = selected.filter(function(value) { return valuesMap.hasOwnProperty(value); }); // A list of options that are currently selected that will still be available in the new options
   
   // Check inputs
   if (defaultSelected !== null) {
     defaultSelected.forEach(function(option) {
       if (typeof option !== "string") { throw "Bad defaultSelected value: must be array of strings."; }
     });
+    if (selected.length === 0) { selected = $.isArray(defaultSelected) ? defaultSelected : [defaultSelected]; }
   }
   
   var useGroups = options[0].length === 3;
@@ -408,15 +411,7 @@ function multiselectSetOptions(element, options, defaultSelected) {
     }).join()).multiselect("rebuild");
   }
   
-  if (selected !== null) {
-    // Filter out the options that were selected but no longer exist
-    var availableOptionMap = {};
-    options.forEach(function(option) { availableOptionMap[option[0]] = true; });
-    selected = selected.filter(function(selectedOption) {
-      return availableOptionMap.hasOwnProperty(selectedOption);
-    });
-    element.multiselect("select", selected); // Select the original options where applicable
-  }
+  element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
 }
 
 var indicate = (function() {
