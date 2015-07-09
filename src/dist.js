@@ -24,14 +24,16 @@ $(function() { Telemetry.init(function() {
   
   updateOptions(function() {
     $("#filter-product").multiselect("select", gInitialPageState.product);
-    if (gInitialPageState.os !== null) { $("#filter-os").multiselect("select", gInitialPageState.os); }
-    else { $("#filter-os").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.arch !== null) { $("#filter-arch").multiselect("select", gInitialPageState.arch); }
     else { $("#filter-arch").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.e10s !== null) { $("#filter-e10s").multiselect("select", gInitialPageState.e10s); }
     else { $("#filter-e10s").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.processType !== null) { $("#filter-process-type").multiselect("select", gInitialPageState.processType); }
     else { $("#filter-process-type").multiselect("selectAll", false).multiselect("updateButtonText"); }
+    
+    if (gInitialPageState.os !== null) { // We accept values such as "WINNT", as well as "WINNT,6.1"
+      $("#filter-os").multiselect("select", expandOSs(gInitialPageState.os));
+    } else { $("#filter-os").multiselect("selectAll", false).multiselect("updateButtonText"); }
     
     for (var filterName in gFilters) {
       var selector = gFilters[filterName];
@@ -92,11 +94,17 @@ function updateOptions(callback) {
   Telemetry.getFilterOptions(parts[0], parts[1], function(optionsMap) {
     multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
     $("#measure").multiselect("select", gInitialPageState.measure);
+
     multiselectSetOptions($("#filter-product"), getHumanReadableOptions("product", deduplicate(optionsMap.application)));
-    multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
     multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("arch", deduplicate(optionsMap.architecture)));
     multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10s", deduplicate(optionsMap.e10sEnabled)));
     multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("processType", deduplicate(optionsMap.child)));
+
+    // Compressing and expanding the OSs also has the effect of making OSs where all the versions were selected also all selected in the new one, regardless of whether those versions were actually in common or not
+    var selectedOSs = compressOSs();
+    multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
+    $("#filter-os").multiselect("select", expandOSs(selectedOSs));
+
     if (callback !== undefined) { indicate(); callback(); }
   });
 }
@@ -259,14 +267,16 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
 function displayHistogram(histogram, evolution, cumulative) {
   cumulative = cumulative || false;
 
-  if (histogram === null) {
+  // Show that the data is missing if there is no histogram, the histogram has an invalid number of buckets, or the histogram exists but has no samples
+  if (histogram === null || histogram.buckets.length < 2 || histogram.count === 0) {
     $("#summary").hide();
     MG.data_graphic({
       chart_type: "missing-data",
       full_width: true, height: 600,
-      left: 100, right: 150,
+      left: 100, right: 0,
       target: "#distribution",
     });
+    $(".mg-missing-pane").remove();
     return;
   }
   $("#summary").show();
@@ -296,6 +306,7 @@ function displayHistogram(histogram, evolution, cumulative) {
     counts = counts.map(function(count) { return total += count; });
   }
   var ends = histogram.map(function(count, start, end, i) { return end; });
+  ends[ends.length - 1] = Infinity;
 
   var distributionSamples = counts.map(function(count, i) { return {value: i, count: (count / histogram.count) * 100}; });
   
@@ -316,8 +327,13 @@ function displayHistogram(histogram, evolution, cumulative) {
     yax_format: function(value) { return value + "%"; },
     mouseover: function(d, i) {
       var count = formatNumber(counts[d.x]), percentage = Math.round(d.y * 100) / 100 + "%";
-      var label = count + " samples (" + percentage + ") between " +
-        formatNumber(cumulative ? 0 : starts[d.x]) + " and " + formatNumber(ends[d.x]);
+      var label;
+      if (ends[d.x] === Infinity) {
+        label = count + " samples (" + percentage + ") above " + formatNumber(cumulative ? 0 : starts[d.x]);
+      } else {
+        label = count + " samples (" + percentage + ") between " + formatNumber(cumulative ? 0 : starts[d.x]) + " and " + formatNumber(ends[d.x]);
+      }
+
       var offset = $("#distribution .mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
       var barWidth = $("#distribution .mg-bar:nth-child(" + (i + 1) + ") rect").get(0).getAttribute("width");
       
@@ -370,7 +386,7 @@ function saveStateToUrlAndCookie() {
   
   // Only store these in the state if they are not all selected
   var selected = $("#filter-os").val() || [];
-  if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = selected; }
+  if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = compressOSs(); }
   var selected = $("#filter-arch").val() || [];
   if (selected.length !== $("#filter-arch option").size()) { gInitialPageState.arch = selected; }
   var selected = $("#filter-e10s").val() || [];
@@ -390,7 +406,11 @@ function saveStateToUrlAndCookie() {
   // Save to the URL hash if it changed
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
-  if (url !== stateString) { window.location.replace(window.location.origin + window.location.pathname + "#" + stateString); }
+  if (url !== stateString) {
+    window.location.replace(window.location.origin + window.location.pathname + "#" + stateString);
+    $(".permalink-control input").hide(); // Hide the permalink box again since the URL changed
+  }
+
   
   // Save the state in a cookie that expires in 3 days
   var expiry = new Date();
@@ -405,9 +425,9 @@ function saveStateToUrlAndCookie() {
   if (gPreviousCSVBlobUrl !== null) { URL.revokeObjectURL(gPreviousCSVBlobUrl); }
   if (gPreviousJSONBlobUrl !== null) { URL.revokeObjectURL(gPreviousJSONBlobUrl); }
   var csvValue = "start,\tend,\tcount\n" + gCurrentHistogram.map(function (count, start, end, i) {
-    return start + ",\t" + end + ",\t" + count;
+    return start + ",\t" + (isFinite(end) ? end : Infinity) + ",\t" + count;
   }).join("\n");
-  var jsonValue = JSON.stringify(gCurrentHistogram.map(function(count, start, end, i) { return {start: start, end: end, count: count} }));
+  var jsonValue = JSON.stringify(gCurrentHistogram.map(function(count, start, end, i) { return {start: start, end: isFinite(end) ? end : Infinity, count: count} }));
   gPreviousCSVBlobUrl = URL.createObjectURL(new Blob([csvValue]));
   gPreviousJSONBlobUrl = URL.createObjectURL(new Blob([jsonValue]));
   $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogram.measure + ".csv");

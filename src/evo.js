@@ -35,14 +35,16 @@ $(function() { Telemetry.init(function() {
   indicate("Updating filters...");
   updateOptions(function(filterOptions) {
     $("#filter-product").multiselect("select", gInitialPageState.product);
-    if (gInitialPageState.os !== null) { $("#filter-os").multiselect("select", gInitialPageState.os); }
-    else { $("#filter-os").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.arch !== null) { $("#filter-arch").multiselect("select", gInitialPageState.arch); }
     else { $("#filter-arch").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.e10s !== null) { $("#filter-e10s").multiselect("select", gInitialPageState.e10s); }
     else { $("#filter-e10s").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.processType !== null) { $("#filter-process-type").multiselect("select", gInitialPageState.processType); }
     else { $("#filter-process-type").multiselect("selectAll", false).multiselect("updateButtonText"); }
+    
+    if (gInitialPageState.os !== null) { // We accept values such as "WINNT", as well as "WINNT,6.1"
+      $("#filter-os").multiselect("select", expandOSs(gInitialPageState.os));
+    } else { $("#filter-os").multiselect("selectAll", false).multiselect("updateButtonText"); }
     
     for (var filterName in gFilters) {
       var selector = gFilters[filterName];
@@ -129,10 +131,15 @@ function updateOptions(callback) {
         $("#measure").multiselect("select", gInitialPageState.measure);
 
         multiselectSetOptions($("#filter-product"), getHumanReadableOptions("product", deduplicate(optionsMap.application)));
-        multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
         multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("arch", deduplicate(optionsMap.architecture)));
         multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10s", deduplicate(optionsMap.e10sEnabled)));
         multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("processType", deduplicate(optionsMap.child)));
+        
+        // Compressing and expanding the OSs also has the effect of making OSs where all the versions were selected also all selected in the new one, regardless of whether those versions were actually in common or not
+        var selectedOSs = compressOSs();
+        multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
+        $("#filter-os").multiselect("select", expandOSs(selectedOSs));
+        
         if (callback !== undefined) { callback(); }
       }
     });
@@ -484,7 +491,7 @@ function saveStateToUrlAndCookie() {
   var selected = $("#filter-arch").val() || [];
   if (selected.length !== $("#filter-arch option").size()) { gInitialPageState.arch = selected; }
   var selected = $("#filter-os").val() || [];
-  if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = selected; }
+  if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = compressOSs(); }
   var selected = $("#filter-e10s").val() || [];
   if (selected.length !== $("#filter-e10s option").size()) { gInitialPageState.e10s = selected; }
   var selected = $("#filter-process-type").val() || [];
@@ -500,7 +507,10 @@ function saveStateToUrlAndCookie() {
   // Save to the URL hash if it changed
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
-  if (url !== stateString) { window.location.replace(window.location.origin + window.location.pathname + "#" + stateString); }
+  if (url !== stateString) {
+    window.location.replace(window.location.origin + window.location.pathname + "#" + stateString);
+    $(".permalink-control input").hide(); // Hide the permalink box again since the URL changed
+  }
   
   // Save the state in a cookie that expires in 3 days
   var expiry = new Date();

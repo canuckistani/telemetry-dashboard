@@ -12,13 +12,16 @@ $(document).ready(function() {
       maxHeight: 500,
       disableIfEmpty: true,
       nSelectedText: $this.data("n-selected") !== undefined ? $this.data("n-selected") : "selected",
+      onDropdownShow: function(event) { // Focus the search box whenever the dropdown is opened
+        setTimeout(function() { $(event.currentTarget).find(".filter input").focus(); }, 0);
+      },
     };
     if ($this.attr("id") === "measure") { // dirty hack that adds searching by spaces to the measure selector only
       options.filterBehavior = "custom";
       options.filterCallback = function(element, query) {
-        var value = $(element).find("label").text().toLowerCase();
+        var currentOption = $(element).find("label").text().toLowerCase();
         query = query.toLowerCase();
-        return value.indexOf(query) >= 0 || value.replace(/_/g, " ").indexOf(query) >= 0;
+        return currentOption.indexOf(query) >= 0 || currentOption.replace(/_/g, " ").indexOf(query) >= 0 || currentOption.indexOf(query.replace(/[ _]/g, "")) >= 0;
       };
     }
     if ($this.attr("title") !== undefined) {
@@ -26,10 +29,6 @@ $(document).ready(function() {
     }
     $this.multiselect(options);
     $this.next().css("margin-top", "-0.25em"); // Align the control so that the baseline matches surrounding text
-  });
-  $(".multiselect-container").scroll(function() { // Make the filter box fixed to the top of the select control
-    var $this = $(this);
-    $this.find(".multiselect-item.filter").css("position", "relative").css("top", $this.scrollTop()).css("z-index", 1);
   });
   
   // Date range pickers
@@ -277,8 +276,7 @@ function getHumanReadableOptions(filterName, options) {
     // Add a hidden version of the option with spaces instead of underscores, to be able to search with spaces
     return options.map(function(option) { return [option, option] });
   } else if (filterName === "channelVersion") {
-    var pattern = /^\w+\/\d+$/;
-    return options.filter(function(option) { return pattern.test(option); }).map(function(option) { return [option, option.replace("/", " ")] });
+    return options.map(function(option) { return [option, option.replace("/", " ")] });
   }
   return options.map(function(option) { return [option, option] });
 }
@@ -414,6 +412,8 @@ function multiselectSetOptions(element, options, defaultSelected) {
   element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
 }
 
+// =========== Histogram/Evolution Dashboard-specific common code
+
 var indicate = (function() {
   var indicatorTimeout = null;
   return function indicate(message) {
@@ -429,3 +429,41 @@ var indicate = (function() {
     }
   }
 })();
+
+function compressOSs() {
+  var selected = $("#filter-os").val() || [];
+  var options = $("#filter-os option").map(function(i, element) { return $(element).attr("value"); }).toArray();
+  var optionCounts = {}, selectedByOS = {};
+  options.forEach(function(option) {
+    var os = option.split(",")[0];
+    optionCounts[os] = optionCounts[os] + 1 || 1;
+  });
+  selected.forEach(function(option) {
+    var os = option.split(",")[0];
+    if (!selectedByOS.hasOwnProperty(os)) { selectedByOS[os] = []; }
+    selectedByOS[os].push(option);
+  });
+  var selectedOSs = [];
+  for (os in selectedByOS) {
+    if (selectedByOS[os].length === optionCounts[os]) { // All versions of this OS are selected, just add the OS name
+      selectedOSs.push(os);
+    } else { // Not all versions selected, add each version individually
+      selectedOSs = selectedOSs.concat(selectedByOS[os]);
+    }
+  }
+  return selectedOSs;
+}
+
+function expandOSs(OSs) {
+  var options = $("#filter-os option").map(function(i, element) { return $(element).attr("value"); }).toArray();
+  var osVersions = [];
+  OSs.forEach(function(osVersion) {
+    if (osVersion.indexOf(",") < 0) { // OS only - all OS versions of this OS
+      var allVersions = options.filter(function(option) { return option.startsWith(osVersion + ",") });
+      osVersions = osVersions.concat(allVersions);
+    } else { // Specific OS version
+      osVersions.push(osVersion);
+    }
+  });
+  return osVersions;
+}
