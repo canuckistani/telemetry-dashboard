@@ -227,8 +227,7 @@ Telemetry.getJSON = function(url, callback) { // WIP: need CORS headers in the r
 
 Telemetry.init = function Telemetry_init(callback) {
   assert(typeof callback === "function", "`callback` must be a function");
-  //Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/", function(channels) {
-    var channels = ["nightly", "aurora", "beta"]; //wip: hardcode the channels as they don't really change
+  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/", function(channels) {
     var loadedChannels = 0, expectedChannels = channels.length * 2;
     Telemetry.CHANNEL_VERSION_BUILDIDS = {};
     Telemetry.CHANNEL_VERSION_DATES = {};
@@ -253,7 +252,7 @@ Telemetry.init = function Telemetry_init(callback) {
         if (loadedChannels == expectedChannels) { callback(); } // This is the last channel that needs to be loaded
       });
     });
-  //});
+  });
 },
 
 Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metric, filters, useSubmissionDate, callback) {
