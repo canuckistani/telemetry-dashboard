@@ -20,6 +20,7 @@ $(function() { Telemetry.init(function() {
   
   if (gInitialPageState.min_channel_version) { $("#min-channel-version").multiselect("select", gInitialPageState.min_channel_version); }
   if (gInitialPageState.max_channel_version) { $("#max-channel-version").multiselect("select", gInitialPageState.max_channel_version); }
+
   var fromVersion = $("#min-channel-version").val(), toVersion = $("#max-channel-version").val();
   var versions = Telemetry.getVersions(fromVersion, toVersion);
   if (versions.length === 0) { $("#min-channel-version").multiselect("select", toVersion); }// Invalid range selected, move min version selector
@@ -96,7 +97,7 @@ $(function() { Telemetry.init(function() {
         calculateEvolutions(function(lines, submissionLines, evolutionDescription) {
           $("#submissions-title").text($("#measure").val() + " submissions");
           $("#measure-description").text(evolutionDescription === null ? $("#measure").val() : evolutionDescription);
-          displayEvolutions(lines, submissionLines, $("input[name=sanitize-toggle]:checked").val() !== "0");
+          displayEvolutions(lines, submissionLines, $("input[name=build-time-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         });
       });
@@ -344,7 +345,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     right: 100, bottom: 50, // Extra space on the right and bottom for labels
     target: "#submissions",
     x_extended_ticks: true,
-    x_label: "Build ID", y_label: "Daily Metric Count",
+    x_label: variableLabel, y_label: "Daily Metric Count",
     transition_on_update: false,
     interpolate: "linear",
     markers: markers,
