@@ -198,11 +198,11 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
     maxDate: endMoment,
     timeZone: 0,
     showDropdowns: true,
-    drops: "up",
+    drops: "up", opens: "center",
     ranges: {
        "All": [startMoment, endMoment],
        "Last 30 Days": [endMoment.clone().subtract(30, "days"), endMoment],
-       "Last 7 Days": [endMoment.clone().subtract(6, 'days'), endMoment],
+       "Last 7 Days": [endMoment.clone().subtract(6, "days"), endMoment],
     },
   }, function(chosenStartMoment, chosenEndMoment, label) {
     updateDateRange(gCurrentDateRangeUpdateCallback, evolution, true);
@@ -355,9 +355,9 @@ function displayHistograms(histograms, dates, cumulative) {
         var count = formatNumber(countsList[0][d.x]), percentage = Math.round(d.y * 100) / 100 + "%";
         var label;
         if (ends[d.x] === Infinity) {
-          label = count + " samples (" + percentage + ") at or above " + formatNumber(cumulative ? 0 : starts[d.x]);
+         label = count + " samples (" + percentage + ") where sample value \u2265 " + formatNumber(cumulative ? 0 : starts[d.x]);
         } else {
-          label = count + " samples (" + percentage + ") from " + formatNumber(cumulative ? 0 : starts[d.x]) + " inclusive to " + formatNumber(ends[d.x]) + " exclusive";
+         label = count + " samples (" + percentage + ") where " + formatNumber(cumulative ? 0 : starts[d.x]) + " \u2264 sample value < " + formatNumber(ends[d.x]);
         }
 
         var offset = $("#distribution .mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
