@@ -251,13 +251,18 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   submissionLines = submissionLines.filter(function(line) { return line.values.length > 0; });
   
   // Transform the data into a form that is suitable for plotting
+  var timezoneOffset = (new Date).getTimezoneOffset() * 60 * 1000; // Timezone offset in milliseconds
   var lineData = lines.map(function (line) {
-    var dataset = line.values.map(function(point) { return {date: new Date(point.x), value: point.y}; });
+    var dataset = line.values.map(function(point) {
+      return {date: new Date(point.x + timezoneOffset), value: point.y};
+    });
     dataset.push(dataset[dataset.length - 1]); // duplicate the last point to work around a metricsgraphics bug if there are multiple datasets where one or more datasets only have one point
     return dataset;
   });
   var submissionLineData = submissionLines.map(function (line) {
-    var dataset = line.values.map(function(point) { return {date: new Date(point.x), value: point.y}; });
+    var dataset = line.values.map(function(point) {
+      return {date: new Date(point.x + timezoneOffset), value: point.y};
+    });
     dataset.push(dataset[dataset.length - 1]); // duplicate the last point to work around a metricsgraphics bug if there are multiple datasets where one or more datasets only have one point
     return dataset;
   });
@@ -296,7 +301,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     mouseover: function(d, i) {
       var date, rolloverCircle, lineList, values;
       if (d.values) {
-        date = d.values[0].date;
+        date = d.values[0].date - timezoneOffset;
         rolloverCircle = $("#evolutions .mg-line-rollover-circle.mg-line" + d.values[0].line_id + "-color").get(0);
         var seen = {}; var entries = d.values.filter(function(entry) {
           if (seen[entry.line_id]) return false;
@@ -305,12 +310,12 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
         lineList = entries.map(function(entry) { return lines[entry.line_id - 1]; });
         values = entries.map(function(entry) { return entry.value; });
       } else {
-        date = d.date;
+        date = d.date - timezoneOffset;
         rolloverCircle = $("#evolutions .mg-line-rollover-circle").get(0);
         lineList = [lines[d.line_id - 1]];
         values = [d.value];
       }
-      var legend = d3.select("#evolutions .mg-active-datapoint").text(moment(date).format("dddd MMMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
+      var legend = d3.select("#evolutions .mg-active-datapoint").text(moment.utc(date).format("dddd MMMM D, YYYY UTC") + " (build " + moment.utc(date).format("YYYYMMDD") + "):").style("fill", "white");
       var lineHeight = 1.1;
       lineList.forEach(function(line, i) {
         var lineIndex = i + 1;
@@ -354,7 +359,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     mouseover: function(d, i) {
       var date, rolloverCircle, lineList, values;
       if (d.values) {
-        date = d.values[0].date;
+        date = d.values[0].date - timezoneOffset;
         rolloverCircle = $("#submissions .mg-line-rollover-circle.mg-line" + d.values[0].line_id + "-color").get(0);
         var seen = {}; var entries = d.values.filter(function(entry) {
           if (seen[entry.line_id]) return false;
@@ -363,12 +368,12 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
         lineList = entries.map(function(entry) { return submissionLines[entry.line_id - 1]; });
         values = entries.map(function(entry) { return entry.value; });
       } else {
-        date = d.date;
+        date = d.date - timezoneOffset;
         rolloverCircle = $("#submissions .mg-line-rollover-circle").get(0);
         lineList = [submissionLines[d.line_id - 1]];
         values = [d.value];
       }
-      var legend = d3.select("#submissions .mg-active-datapoint").text(moment(date).format("dddd MMMM D, YYYY") + " (build " + moment(date).format("YYYYMMDD") + "):").style("fill", "white");
+      var legend = d3.select("#submissions .mg-active-datapoint").text(moment.utc(date).format("dddd MMMM D, YYYY UTC") + " (build " + moment.utc(date).format("YYYYMMDD") + "):").style("fill", "white");
       var lineHeight = 1.1;
       lineList.forEach(function(line, i) {
         var lineIndex = i + 1;
