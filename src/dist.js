@@ -1,6 +1,6 @@
 var gInitialPageState = null;
 var gFilterChangeTimeout = null;
-var gCurrentHistogram = null; gCurrentEvolution = null;
+var gCurrentHistograms = null; gCurrentDates = null;
 var gFilters = null, gPreviousFilterAllSelected = {};
 
 indicate("Initializing Telemetry...");
@@ -57,10 +57,10 @@ $(function() { Telemetry.init(function() {
         }
         gPreviousFilterAllSelected[$this.attr("id")] = selected.length === options.length; // Store state
         
-        calculateHistogram(function(histogram, evolution) {
+        calculateHistograms(function(histograms, evolution) {
           $("#measure-description").text(evolution === null ? $("#measure").val() : evolution.description);
-          gCurrentHistogram = histogram; gCurrentEvolution = evolution;
-          displayHistogram(histogram, evolution, $("input[name=cumulative-toggle]:checked").val() !== "0");
+          gCurrentHistograms = histograms; gCurrentDates = evolution.dates();
+          displayHistograms(histograms, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         });
       }, 0);
@@ -71,7 +71,7 @@ $(function() { Telemetry.init(function() {
   });
 
   $("input[name=cumulative-toggle]").change(function() {
-    displayHistogram(gCurrentHistogram, gCurrentEvolution, $("input[name=cumulative-toggle]:checked").val() !== "0");
+    displayHistograms(gCurrentHistograms, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
     saveStateToUrlAndCookie();
   });
   
@@ -109,22 +109,35 @@ function updateOptions(callback) {
   });
 }
 
-function calculateHistogram(callback) {
+function calculateHistograms(callback) {
   // Get selected version, measure, and aggregate options
   var channelVersion = $("#channel-version").val();
   var measure = $("#measure").val();
   
   var filterSets = getFilterSets(gFilters);
   
+  var showAllName = "e10sEnabled";
+  var showAllFilterSets = {};
+  if (filterSets.length > 0 && filterSets[0][showAllName] === undefined) { // Option not filtered, all options for this filter are selected
+    (gFilters[showAllName].val() || []).forEach(function(option) {
+      showAllFilterSets[option] = filterSets;
+    });
+  } else {
+    filterSets.forEach(function(filterSet) {
+      if (!showAllFilterSets.hasOwnProperty(filterSet[showAllName])) { showAllFilterSets[filterSet[showAllName]] = []; }
+      showAllFilterSets[filterSet[showAllName]].push(filterSet);
+    });
+  }
+  
   var filtersCount = 0;
   var fullEvolution = null;
   var useSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0";
-  indicate("Updating histogram... 0%");
+  indicate("Updating histograms... 0%");
   filterSets.forEach(function(filterSet) {
     var parts = channelVersion.split("/");
     Telemetry.getEvolution(parts[0], parts[1], measure, filterSet, useSubmissionDate, function(evolution) {
       filtersCount ++;
-      indicate("Updating histogram... " + Math.round(100 * filtersCount / filterSets.length) + "%");
+      indicate("Updating histograms... " + Math.round(100 * filtersCount / filterSets.length) + "%");
       if (fullEvolution === null) {
         fullEvolution = evolution;
       } else if (evolution !== null) {
@@ -133,21 +146,21 @@ function calculateHistogram(callback) {
       if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
         indicate();
         updateDateRange(function(dates) {
-          if (dates == null) {
-            callback(null, null);
-          } else {
+          if (dates == null) { // No dates in the selected range, so no histograms available
+            callback([], null);
+          } else { // Filter the evolution to include only those histograms that are in the selected range
             var filteredEvolution = fullEvolution.dateRange(dates[0], dates[dates.length - 1])
-            var fullHistogram = filteredEvolution.histogram();
-            callback(fullHistogram, filteredEvolution);
+            var fullHistograms = [filteredEvolution.histogram()];
+            callback(fullHistograms, filteredEvolution);
           }
         }, fullEvolution, false);
       }
     });
   });
-  if (filterSets.length === 0) {
+  if (filterSets.length === 0) { // No filters selected, so no histograms could be created
     indicate();
     updateDateRange(function(dates) {
-      callback(null, null);
+      callback([], null);
     }, null, false);
   }
 }
@@ -264,12 +277,34 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
   gCurrentDateRangeUpdateCallback(dates);
 }
 
-function displayHistogram(histogram, evolution, cumulative) {
+function displayHistograms(histograms, dates, cumulative) {
   cumulative = cumulative || false;
 
-  // Show that the data is missing if there is no histogram, the histogram has an invalid number of buckets, or the histogram exists but has no samples
-  if (histogram === null || histogram.buckets.length < 2 || histogram.count === 0) {
+  if (histograms.length === 1) { // Only one histogram, show a summary
+    var histogram = histograms[0];
+    $("#prop-kind").text(histogram.kind);
+    $("#prop-dates").text(formatNumber(dates.length));
+    $("#prop-date-range").text(moment(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment(dates[dates.length - 1]).format("YYYY/MM/DD")));
+    $("#prop-submissions").text(formatNumber(histogram.submissions));
+    $("#prop-count").text(formatNumber(histogram.count));
+    if (histogram.kind == "linear" || histogram.kind == "exponential") {
+      $("#prop-p5").text(formatNumber(histogram.percentile(5)));
+      $("#prop-p25").text(formatNumber(histogram.percentile(25)));
+      $("#prop-p50").text(formatNumber(histogram.percentile(50)));
+      $("#prop-p75").text(formatNumber(histogram.percentile(75)));
+      $("#prop-p95").text(formatNumber(histogram.percentile(95)));
+      $(".scalar-only").show();
+    } else {
+      $(".scalar-only").hide();
+    }
+    $("#summary").show();
+  }
+  else {
     $("#summary").hide();
+  }
+  
+  // No histograms available
+  if (histograms.length === 0) {
     MG.data_graphic({
       chart_type: "missing-data",
       full_width: true, height: 600,
@@ -279,81 +314,87 @@ function displayHistogram(histogram, evolution, cumulative) {
     $(".mg-missing-pane").remove();
     return;
   }
-  $("#summary").show();
-
-  // Update the summary
-  var dates = evolution.dates();
-  $("#prop-kind").text(histogram.kind);
-  $("#prop-dates").text(formatNumber(dates.length));
-  $("#prop-date-range").text(moment(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment(dates[dates.length - 1]).format("YYYY/MM/DD")));
-  $("#prop-submissions").text(formatNumber(histogram.submissions));
-  $("#prop-count").text(formatNumber(histogram.count));
-  if (histogram.kind == "linear" || histogram.kind == "exponential") {
-    $("#prop-p5").text(formatNumber(histogram.percentile(5)));
-    $("#prop-p25").text(formatNumber(histogram.percentile(25)));
-    $("#prop-p50").text(formatNumber(histogram.percentile(50)));
-    $("#prop-p75").text(formatNumber(histogram.percentile(75)));
-    $("#prop-p95").text(formatNumber(histogram.percentile(95)));
-    $(".scalar-only").show();
-  } else {
-    $(".scalar-only").hide();
-  }
   
-  var starts = histogram.map(function(count, start, end, i) { return start; });
-  var counts = histogram.map(function(count, start, end, i) { return count; });
-  if (cumulative) {
-    var total = 0;
-    counts = counts.map(function(count) { return total += count; });
-  }
-  var ends = histogram.map(function(count, start, end, i) { return end; });
+  // All histograms must have the same buckets and be of the same kind
+  var starts = histograms[0].map(function(count, start, end, i) { return start; });
+  var ends = histograms[0].map(function(count, start, end, i) { return end; });
   ends[ends.length - 1] = Infinity;
+  var totalCounts = histograms.map(function(histogram) { return histogram.count; });
+  var countsList = histograms.map(function(histogram) {
+    return histogram.map(function(count, start, end, i) { return count; });
+  });
+  if (cumulative) { // Show cumulative histogram by adding up all the previous data points
+    countsList = countsList.map(function(counts) {
+      var total = 0;
+      return counts.map(function(count) { return total += count; });
+    });
+  }
 
-  var distributionSamples = counts.map(function(count, i) { return {value: i, count: (count / histogram.count) * 100}; });
+  var distributionSamples = countsList.map(function(counts, i) {
+    return counts.map(function(count, j) { return {value: j, count: (count / totalCounts[i]) * 100}; });
+  });
   
   // Plot the data using MetricsGraphics
-  MG.data_graphic({
-    data: distributionSamples,
-    binned: true,
-    chart_type: "histogram",
-    full_width: true, height: 600,
-    left: 150, right: 150,
-    transition_on_update: false,
-    target: "#distribution",
-    x_label: histogram.description, y_label: "Percentage of Samples",
-    xax_ticks: 20,
-    y_extended_ticks: true,
-    x_accessor: "value", y_accessor: "count",
-    xax_format: function(index) { return formatNumber(starts[index]); },
-    yax_format: function(value) { return value + "%"; },
-    mouseover: function(d, i) {
-      var count = formatNumber(counts[d.x]), percentage = Math.round(d.y * 100) / 100 + "%";
-      var label;
-      if (ends[d.x] === Infinity) {
-        label = count + " samples (" + percentage + ") at or above " + formatNumber(cumulative ? 0 : starts[d.x]);
-      } else {
-        label = count + " samples (" + percentage + ") from " + formatNumber(cumulative ? 0 : starts[d.x]) + " inclusive to " + formatNumber(ends[d.x]) + " exclusive";
-      }
+  if (histograms.length === 1) { // One histogram available, display as histogram
+    MG.data_graphic({
+      data: distributionSamples[0],
+      binned: true,
+      chart_type: "histogram",
+      full_width: true, height: 600,
+      left: 150, right: 150,
+      transition_on_update: false,
+      target: "#distribution",
+      x_label: histogram.description, y_label: "Percentage of Samples",
+      xax_ticks: 20,
+      y_extended_ticks: true,
+      x_accessor: "value", y_accessor: "count",
+      xax_format: function(index) { return formatNumber(starts[index]); },
+      yax_format: function(value) { return value + "%"; },
+      mouseover: function(d, i) {
+        var count = formatNumber(countsList[0][d.x]), percentage = Math.round(d.y * 100) / 100 + "%";
+        var label;
+        if (ends[d.x] === Infinity) {
+          label = count + " samples (" + percentage + ") at or above " + formatNumber(cumulative ? 0 : starts[d.x]);
+        } else {
+          label = count + " samples (" + percentage + ") from " + formatNumber(cumulative ? 0 : starts[d.x]) + " inclusive to " + formatNumber(ends[d.x]) + " exclusive";
+        }
 
-      var offset = $("#distribution .mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
-      var barWidth = $("#distribution .mg-bar:nth-child(" + (i + 1) + ") rect").get(0).getAttribute("width");
-      
-      // Reposition element
-      var legend = d3.select("#distribution .mg-active-datapoint").text(label).attr("transform", offset)
-        .attr("x", barWidth / 2).attr("y", "0").attr("dy", "-10").attr("text-anchor", "middle").style("fill", "white");
-      var bbox = legend[0][0].getBBox();
-      var padding = 5;
-      
-      // Add background
-      d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
-      d3.select("#distribution svg").insert("rect", ".mg-active-datapoint").classed("active-datapoint-background", true)
-        .attr("x", bbox.x - padding).attr("y", bbox.y - padding).attr("transform", offset)
-        .attr("width", bbox.width + padding * 2).attr("height", bbox.height + padding * 2)
-        .attr("rx", "3").attr("ry", "3").style("fill", "#333");
-    },
-    mouseout: function(d, i) {
-      d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
-    },
-  });
+        var offset = $("#distribution .mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
+        var barWidth = $("#distribution .mg-bar:nth-child(" + (i + 1) + ") rect").get(0).getAttribute("width");
+        
+        // Reposition element
+        var legend = d3.select("#distribution .mg-active-datapoint").text(label).attr("transform", offset)
+          .attr("x", barWidth / 2).attr("y", "0").attr("dy", "-10").attr("text-anchor", "middle").style("fill", "white");
+        var bbox = legend[0][0].getBBox();
+        var padding = 5;
+        
+        // Add background
+        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
+        d3.select("#distribution svg").insert("rect", ".mg-active-datapoint").classed("active-datapoint-background", true)
+          .attr("x", bbox.x - padding).attr("y", bbox.y - padding).attr("transform", offset)
+          .attr("width", bbox.width + padding * 2).attr("height", bbox.height + padding * 2)
+          .attr("rx", "3").attr("ry", "3").style("fill", "#333");
+      },
+      mouseout: function(d, i) {
+        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
+      },
+    });
+  } else { // Multiple histograms available, display as overlaid lines
+    MG.data_graphic({
+      data: distributionSamples,
+      chart_type: "line",
+      full_width: true, height: 600,
+      left: 100, right: 150,
+      transition_on_update: false,
+      target: "#distribution",
+      x_label: histograms[0].description, y_label: "Percentage of Samples",
+      xax_ticks: 20,
+      y_extended_ticks: true,
+      x_accessor: "value", y_accessor: "count",
+      xax_format: function(index) { return formatNumber(starts[index]); },
+      yax_format: function(value) { return value + "%"; },
+    });
+  }
   
     // Reposition and resize text
   $(".mg-x-axis text, .mg-y-axis text, .mg-histogram .axis text, .mg-baselines text, .mg-active-datapoint").css("font-size", "12px");
@@ -426,23 +467,24 @@ function saveStateToUrlAndCookie() {
   $("#switch-views").attr("href", dashboardURL);
   
   // Update export links with the new histogram
-  if (gCurrentHistogram !== null) {
+  if (gCurrentHistograms.length === 1) { // wip: remove this
     if (gPreviousCSVBlobUrl !== null) { URL.revokeObjectURL(gPreviousCSVBlobUrl); }
     if (gPreviousJSONBlobUrl !== null) { URL.revokeObjectURL(gPreviousJSONBlobUrl); }
-    var csvValue = "start,\tend,\tcount\n" + gCurrentHistogram.map(function (count, start, end, i) {
+    var csvValue = "start,\tend,\tcount\n" + gCurrentHistograms[0].map(function (count, start, end, i) {
       return start + ",\t" + (isFinite(end) ? end : Infinity) + ",\t" + count;
     }).join("\n");
-    var jsonValue = JSON.stringify(gCurrentHistogram.map(function(count, start, end, i) { return {start: start, end: isFinite(end) ? end : Infinity, count: count} }));
+    var jsonValue = JSON.stringify(gCurrentHistograms[0].map(function(count, start, end, i) { return {start: start, end: isFinite(end) ? end : Infinity, count: count} }));
     gPreviousCSVBlobUrl = URL.createObjectURL(new Blob([csvValue]));
     gPreviousJSONBlobUrl = URL.createObjectURL(new Blob([jsonValue]));
-    $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogram.measure + ".csv");
-    $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistogram.measure + ".json");
+    $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistograms[0].measure + ".csv");
+    $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistograms[0].measure + ".json");
+  } else {
+    $("#export-csv, #export-json").hide();
   }
   
   // If advanced settings are not at their defaults, display a notice in the panel header
-  if (gCurrentEvolution !== null) {
-    var fullDates = gCurrentEvolution.dates();
-    var startMoment = moment(fullDates[0]), endMoment = moment(fullDates[fullDates.length - 1]);
+  if (gCurrentDates !== null) {
+    var startMoment = moment(gCurrentDates[0]), endMoment = moment(gCurrentDates[gCurrentDates.length - 1]);
   } else {
     var startMoment = start, endMoment = end;
   }

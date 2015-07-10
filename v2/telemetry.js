@@ -16,12 +16,13 @@ var Telemetry = {
 var urlCallbacks = {}
 
 Telemetry.Histogram = (function() {
-  function Histogram(buckets, values, kind, submissions, description) {
+  function Histogram(buckets, values, kind, submissions, description, measure) {
     assert(typeof buckets[0] === "number", "`buckets` must be an array");
     assert(typeof values[0] === "number", "`values` must be an array");
     assert(["flag", "boolean", "count", "enumerated", "linear", "exponential"].indexOf(kind) >= 0, "`kind` must be a valid histogram kind");
     assert(typeof submissions === "number", "`submissions` must be a number");
     assert(typeof description === "string", "`description` must be a string");
+    assert(typeof measure === "string", "`measure` must be a string");
     this.buckets = buckets;
     this.values = values;
     
@@ -29,6 +30,7 @@ Telemetry.Histogram = (function() {
     this.kind = kind;
     this.submissions = submissions;
     this.description = description;
+    this.measure = measure
   }
   
   Histogram.prototype.lastBucketUpper = function() {
@@ -86,15 +88,17 @@ Telemetry.Histogram = (function() {
 })();
 
 Telemetry.Evolution = (function() {
-  function Evolution(buckets, data, kind, description) {
+  function Evolution(buckets, data, kind, description, measure) {
     assert(typeof buckets[0] === "number", "`buckets` must be an array");
     assert(typeof data[0].histogram[0] === "number", "`data` must be an array");
     assert(typeof kind === "string", "`kind` must be a string");
     assert(typeof description === "string", "`description` must be a string");
+    assert(typeof measure === "string", "`measure` must be a string");
     this.buckets = buckets;
     this.data = data;
     this.kind = kind;
     this.description = description;
+    this.measure = measure;
   }
   
   Evolution.prototype.dates = function() {
@@ -131,7 +135,7 @@ Telemetry.Evolution = (function() {
         histogram: histogram,
       };
     });
-    return new Telemetry.Evolution(this.buckets, dataset, this.kind, this.description);
+    return new Telemetry.Evolution(this.buckets, dataset, this.kind, this.description, this.measure);
   };
   
   Evolution.prototype.dateRange = function(startDate, endDate) {
@@ -144,7 +148,7 @@ Telemetry.Evolution = (function() {
       return startDate <= date && date <= endDate;
     });
     
-    return new Telemetry.Evolution(this.buckets, data, this.kind, this.description);
+    return new Telemetry.Evolution(this.buckets, data, this.kind, this.description, this.measure);
   };
   
   Evolution.prototype.histogram = function() {
@@ -154,14 +158,14 @@ Telemetry.Evolution = (function() {
       return values;
     }, []);
     
-    return new Telemetry.Histogram(this.buckets, values, this.kind, submissions, this.description);
+    return new Telemetry.Histogram(this.buckets, values, this.kind, submissions, this.description, this.measure);
   };
   
   Evolution.prototype.map = function(callback) {
     var evolution = this;
     return this.data.sort(function(a, b) { return parseInt(a.date) - parseInt(b.date); })
       .map(function(entry, i) {
-      var histogram = new Telemetry.Histogram(evolution.buckets, entry.histogram, evolution.kind, entry.count, evolution.description);
+      var histogram = new Telemetry.Histogram(evolution.buckets, entry.histogram, evolution.kind, entry.count, evolution.description, evolution.measure);
       return callback.call(evolution, histogram, i);
     });
   };
@@ -276,7 +280,7 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
       assert(status === 404, "Could not obtain evolution"); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
       callback(null);
     } else {
-      var evolution = new Telemetry.Evolution(histograms.buckets, histograms.data, histograms.kind, histograms.description);
+      var evolution = new Telemetry.Evolution(histograms.buckets, histograms.data, histograms.kind, histograms.description, metric);
       callback(evolution);
     }
   });
