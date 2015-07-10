@@ -352,8 +352,6 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     markers: markers,
     aggregate_rollover: true,
     linked: true,
-    min_x: minDate === null ? null : new Date(minDate),
-    max_x: maxDate === null ? null : new Date(maxDate),
     mouseover: function(d, i) {
       var date, rolloverCircle, lineList, values;
       if (d.values) {
