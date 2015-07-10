@@ -218,7 +218,7 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
         
         // Filter out those points corresponding to histograms where the number of submissions is too low
         var submissionsCutoff = sanitize ? Math.max(Math.max.apply(Math, submissionValues) / 100, 100) : 0;
-        var timeCutoff = moment().add(1, "years").toDate(); // Cut off all dates past one year in the future
+        var timeCutoff = moment.utc().add(1, "years").toDate(); // Cut off all dates past one year in the future
         var finalAggregateValues = aggregateValues.map(function(values) { return []; }), finalSubmissionValues = [];
         dates.forEach(function(date, i) {
           if (submissionValues[i] < submissionsCutoff) { return; }

@@ -176,7 +176,7 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
   
   var dates = [];
   if (evolution !== null) {
-    var timeCutoff = moment().add(1, "years").toDate().getTime();
+    var timeCutoff = moment.utc().add(1, "years").toDate().getTime();
     dates = evolution.dates().filter(function(date) { return date <= timeCutoff; }); // Cut off all dates past one year in the future
   }
   if (dates.length === 0) {
@@ -188,7 +188,7 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
     return;
   }
   
-  var startMoment = moment(dates[0]), endMoment = moment(dates[dates.length - 1]);
+  var startMoment = moment.utc(dates[0]), endMoment = moment.utc(dates[dates.length - 1]);
 
   // Update the start and end range and update the selection if necessary
   var picker = $("#date-range").data("daterangepicker");
@@ -196,6 +196,7 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
     format: "YYYY/MM/DD",
     minDate: startMoment,
     maxDate: endMoment,
+    timeZone: 0,
     showDropdowns: true,
     drops: "up",
     ranges: {
@@ -210,7 +211,7 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
   // First load, update the date picker from the page state
   if (!gLoadedDateRangeFromState && gInitialPageState.start_date !== null && gInitialPageState.end_date !== null) {
     gLoadedDateRangeFromState = true;
-    var start = moment(gInitialPageState.start_date), end = moment(gInitialPageState.end_date);
+    var start = moment.utc(gInitialPageState.start_date), end = moment.utc(gInitialPageState.end_date);
     if (start.isValid() && end.isValid()) {
       picker.setStartDate(start); picker.setEndDate(end);
       gPreviousStartMoment = startMoment; gPreviousEndMoment = endMoment;
@@ -237,18 +238,18 @@ function updateDateRange(callback, evolution, updatedByUser, shouldUpdateRangeba
       min: startMoment, max: endMoment.clone().add(1, "days"),
       maxRanges: 1,
       valueFormat: function(ts) { return ts; },
-      valueParse: function(date) { return moment(date).valueOf(); },
+      valueParse: function(date) { return moment.utc(date).valueOf(); },
       label: function(a) {
         var days = (a[1] - a[0]) / 86400000;
-        return days < 5 ? days : moment(a[1]).from(a[0], true);
+        return days < 5 ? days : moment.utc(a[1]).from(a[0], true);
       },
       snap: 1000 * 60 * 60 * 24, minSize: 1000 * 60 * 60 * 24, bgLabels: 0,
     }).on("changing", function(e, ranges, changed) {
       var range = ranges[0];
       if (gLastTimeoutID !== null) { clearTimeout(gLastTimeoutID); }
       gLastTimeoutID = setTimeout(function() { // Debounce slider movement callback
-        picker.setStartDate(moment(range[0]));
-        picker.setEndDate(moment(range[1]).subtract(1, "days"));
+        picker.setStartDate(moment.utc(range[0]));
+        picker.setEndDate(moment.utc(range[1]).subtract(1, "days"));
         updateDateRange(gCurrentDateRangeUpdateCallback, evolution, true, false);
       }, 50);
     });
@@ -284,7 +285,7 @@ function displayHistograms(histograms, dates, cumulative) {
     var histogram = histograms[0];
     $("#prop-kind").text(histogram.kind);
     $("#prop-dates").text(formatNumber(dates.length));
-    $("#prop-date-range").text(moment(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment(dates[dates.length - 1]).format("YYYY/MM/DD")));
+    $("#prop-date-range").text(moment.utc(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment.utc(dates[dates.length - 1]).format("YYYY/MM/DD")));
     $("#prop-submissions").text(formatNumber(histogram.submissions));
     $("#prop-count").text(formatNumber(histogram.count));
     if (histogram.kind == "linear" || histogram.kind == "exponential") {
@@ -419,8 +420,8 @@ function saveStateToUrlAndCookie() {
     product: $("#filter-product").val() || [],
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
-    start_date: moment(picker.startDate).format("YYYY-MM-DD"),
-    end_date: moment(picker.endDate).format("YYYY-MM-DD"),
+    start_date: moment.utc(picker.startDate).format("YYYY-MM-DD"),
+    end_date: moment.utc(picker.endDate).format("YYYY-MM-DD"),
     
     // Save a few unused properties that are used in the evolution dashboard, since state is shared between the two dashboards
     min_channel_version: gInitialPageState.min_channel_version !== undefined ?
@@ -484,11 +485,11 @@ function saveStateToUrlAndCookie() {
   
   // If advanced settings are not at their defaults, display a notice in the panel header
   if (gCurrentDates !== null) {
-    var startMoment = moment(gCurrentDates[0]), endMoment = moment(gCurrentDates[gCurrentDates.length - 1]);
+    var startMoment = moment.utc(gCurrentDates[0]), endMoment = moment.utc(gCurrentDates[gCurrentDates.length - 1]);
   } else {
     var startMoment = start, endMoment = end;
   }
-  var start = moment(gInitialPageState.start_date), end = moment(gInitialPageState.end_date);
+  var start = moment.utc(gInitialPageState.start_date), end = moment.utc(gInitialPageState.end_date);
   if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !start.isSame(startMoment) || !end.isSame(endMoment)) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
