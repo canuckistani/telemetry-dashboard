@@ -96,7 +96,7 @@ $(function() { Telemetry.init(function() {
         calculateEvolutions(function(lines, submissionLines, evolutionDescription) {
           $("#submissions-title").text($("#measure").val() + " submissions");
           $("#measure-description").text(evolutionDescription === null ? $("#measure").val() : evolutionDescription);
-          displayEvolutions(lines, submissionLines);
+          displayEvolutions(lines, submissionLines, $("input[name=sanitize-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         });
       });
@@ -242,9 +242,7 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
   }
 }
 
-function displayEvolutions(lines, submissionLines, minDate, maxDate) {
-  minDate = minDate || null; maxDate = maxDate || null;
-
+function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   indicate("Rendering evolutions...");
   
   // filter out empty lines
