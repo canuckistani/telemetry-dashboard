@@ -131,10 +131,10 @@ function updateOptions(callback) {
         multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
         $("#measure").multiselect("select", gInitialPageState.measure);
 
-        multiselectSetOptions($("#filter-product"), getHumanReadableOptions("product", deduplicate(optionsMap.application)));
-        multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("arch", deduplicate(optionsMap.architecture)));
-        multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10s", deduplicate(optionsMap.e10sEnabled)));
-        multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("processType", deduplicate(optionsMap.child)));
+        multiselectSetOptions($("#filter-product"), getHumanReadableOptions("application", deduplicate(optionsMap.application)));
+        multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("architecture", deduplicate(optionsMap.architecture)));
+        multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10sEnabled", deduplicate(optionsMap.e10sEnabled)));
+        multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("child", deduplicate(optionsMap.child)));
         
         // Compressing and expanding the OSs also has the effect of making OSs where all the versions were selected also all selected in the new one, regardless of whether those versions were actually in common or not
         var selectedOSs = compressOSs();
@@ -159,7 +159,7 @@ function calculateEvolutions(callback) {
   var aggregates = $("#aggregates").val() || [];
 
   // Obtain a mapping from filter names to filter options
-  var filterSets = getFilterSets(gFilters);
+  var filterSets = getFilterSetsMapping(gFilters)["*"];
 
   var lines = [], submissionLines = [];
   var versionCount = 0;

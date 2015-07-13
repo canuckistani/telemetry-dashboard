@@ -119,6 +119,8 @@ function loadStateFromUrlAndCookie() {
     pageState.e10s.split("!").filter(function(v) { return v !== ""; }) : null;
   pageState.processType = typeof pageState.processType === "string" && pageState.processType !== "" && pageState.processType !== "null" ?
     pageState.processType.split("!").filter(function(v) { return v !== ""; }) : null;
+  pageState.compare = typeof pageState.compare === "string" && ["", "os", "architecture", "e10sEnabled", "child"].indexOf(pageState.compare) >= 0 ?
+    pageState.compare : "";
   
   pageState.use_submission_date = pageState.use_submission_date === "0" || pageState.use_submission_date === "1" ? parseInt(pageState.use_submission_date) : 0;
   pageState.sanitize = pageState.sanitize === "0" || pageState.sanitize === "1" ? parseInt(pageState.sanitize) : 1;
@@ -128,42 +130,23 @@ function loadStateFromUrlAndCookie() {
   return pageState;
 }
 
-// Generate array of individual filter sets that, when the resulting histograms are added together, results in the same histogram as if all the filter options were selected
-function getFilterSets(filters) {
+// Generate a map of arrays of individual filter sets that, when the resulting histograms are added together, results in the same histogram as if all the filter options were selected
+function getFilterSetsMapping(filters, comparisonName) {
+  comparisonName = comparisonName || null;
+
   // Obtain a mapping from filter names to filter options
   var filterMapping = {};
   for (var filterName in filters) {
     var selector = filters[filterName];
     var selected = selector.val() || [];
-    if (selected.length !== selector.find("option").length) { // Some options are not selected, so we need to filter
-      if (filterName === "os") { // special case filtering for OSs, since there are two separate versions
-        var osCounts = {}; // get a mapping of OSs to the number of OS versions it has
-        selector.find("option").each(function(i, option) {
-          var os = option.getAttribute("value").split(",")[0];
-          osCounts[os] = (osCounts[os] || 0) + 1;
-        });
-        var selectedOptions = {}; // get a mapping of the selected OSs to the number of OS versions selected
-        selected.forEach(function(filterOption) {
-          var os = filterOption.split(",")[0];
-          if (!selectedOptions.hasOwnProperty(os)) { selectedOptions[os] = []; }
-          selectedOptions[os].push(filterOption)
-        });
-        var selectedOSs = [];
-        for (var os in selectedOptions) {
-          if (selectedOptions[os].length === osCounts[os]) { // all versions of a specific OS are selected
-            selectedOSs.push(os);
-          } else { // not all versions are selected, add all versions
-            selectedOSs = selectedOSs.concat(selectedOptions[os]);
-          }
-        };
-        filterMapping["os"] = selectedOSs;
-      } else {
+    if (selected.length !== selector.find("option").length) { // Some options are not selected, so we need to explicitly filter
+      if (filterName === "os") { selected = compressOSs(); }
+      if (filterName !== comparisonName) { // avoid filtering by the comparison name
         filterMapping[filterName] = selected;
       }
     }
   }
   
-  // Compute filter sets
   function copy(obj) {
     var result = {};
     for (var key in obj) {
@@ -171,26 +154,52 @@ function getFilterSets(filters) {
     }
     return result;
   }
-  var filterSets = [{}];
-  for (var filterName in filterMapping) {
-    filterSets = [].concat.apply([], filterMapping[filterName].map(function(filterValue) {
-      return filterSets.map(function(filterSet) {
-        var newFilterSet = copy(filterSet);
-        if (filterName === "os") {
-          if (filterValue.indexOf(",") >= 0) { // we have an OS value like "Windows_NT,6.1", and we want to set the os filter to Windows_NT and the osVersion filter to 6.1
-            var parts = filterValue.split(",");
-            newFilterSet["os"] = parts[0]; newFilterSet["osVersion"] = parts[1];
+  function getFilterSets(filterMapping) {
+    var filterSets = [{}];
+    for (var filterName in filterMapping) {
+      filterSets = [].concat.apply([], filterMapping[filterName].map(function(filterValue) {
+        return filterSets.map(function(filterSet) {
+          var newFilterSet = copy(filterSet);
+          if (filterName === "os") {
+            if (filterValue.indexOf(",") >= 0) { // we have an OS value like "Windows_NT,6.1", and we want to set the os filter to Windows_NT and the osVersion filter to 6.1
+              var parts = filterValue.split(",");
+              newFilterSet["os"] = parts[0]; newFilterSet["osVersion"] = parts[1];
+            } else { // we have an OS value like "Windows_NT" (all versions of Windows), just set the os filter, not the osVersion filter
+              newFilterSet["os"] = filterValue;
+            }
+          } else {
+            newFilterSet[filterName] = filterValue;
+          }
+          return newFilterSet;
+        });
+      }));
+    }
+    return filterSets;
+  }
+  
+  // Add a new filter set collection for each comparison option, or just one if not comparing
+  var filterSetsMapping = {};
+  if (comparisonName === null) {
+    filterSetsMapping["*"] = getFilterSets(filterMapping);
+  } else {
+    var comparisonValues = comparisonName === "os" ? compressOSs() : filters[comparisonName].val() || [];
+    comparisonValues.forEach(function(comparisonValue) {
+      filterSetsMapping[comparisonValue] = getFilterSets(filterMapping).map(function(filterSet) {
+        if (comparisonName === "os") {
+          if (comparisonValue.indexOf(",") >= 0) { // we have an OS value like "Windows_NT,6.1", and we want to set the os filter to Windows_NT and the osVersion filter to 6.1
+            var parts = comparisonValue.split(",");
+            filterSet["os"] = parts[0]; filterSet["osVersion"] = parts[1];
           } else { // we have an OS value like "Windows_NT" (all versions of Windows), just set the os filter, not the osVersion filter
-            newFilterSet["os"] = filterValue;
+            filterSet["os"] = comparisonValue;
           }
         } else {
-          newFilterSet[filterName] = filterValue;
+          filterSet[comparisonName] = comparisonValue;
         }
-        return newFilterSet;
+        return filterSet;
       });
-    }));
+    });
   }
-  return filterSets;
+  return filterSetsMapping;
 }
 
 function getHumanReadableOptions(filterName, options) {
@@ -209,7 +218,12 @@ function getHumanReadableOptions(filterName, options) {
   if (filterName === "os") {
     var entries = options.map(function(option) {
       var parts = option.split(",");
-      return {os: parts[0], osName: systemNames.hasOwnProperty(parts[0]) ? systemNames[parts[0]] : parts[0], version: parts[1], value: option};
+      return {
+        os: parts[0],
+        osName: systemNames.hasOwnProperty(parts[0]) ? systemNames[parts[0]] : parts[0],
+        version: parts.length > 1 ? parts[1] : null,
+        value: option,
+      };
     });
     
     var osEntryMapping = {}; entries.forEach(function(entry) {
@@ -248,6 +262,7 @@ function getHumanReadableOptions(filterName, options) {
       var entries = osEntryMapping[os];
       return entries.map(function(entry) {
         var versionName = entry.version;
+        if (versionName === null) { return [entry.value, entry.osName, "Any " + entry.osName]; }
         if (entry.os === "Windows_NT") {
           versionName = windowsVersionNames.hasOwnProperty(entry.version) ? windowsVersionNames[entry.version] : entry.version;
         } else if (entry.os === "Darwin") {
@@ -260,15 +275,15 @@ function getHumanReadableOptions(filterName, options) {
         return [entry.value, entry.osName + " " + versionName, "Any " + entry.osName];
       });
     }));
-  } else if (filterName === "arch") {
+  } else if (filterName === "architecture") {
     return options.map(function(option) {
       return [option, archNames.hasOwnProperty(option) ? archNames[option] : option];
     });
-  } else if (filterName === "e10s") {
+  } else if (filterName === "e10sEnabled") {
     return options.map(function(option) {
       return [option, e10sNames.hasOwnProperty(option) ? e10sNames[option] : option];
     });
-  } else if (filterName === "processType") {
+  } else if (filterName === "child") {
     return options.map(function(option) {
       return [option, processTypeNames.hasOwnProperty(option) ? processTypeNames[option] : option];
     });
@@ -433,11 +448,12 @@ var indicate = (function() {
 function compressOSs() {
   var selected = $("#filter-os").val() || [];
   var options = $("#filter-os option").map(function(i, element) { return $(element).attr("value"); }).toArray();
-  var optionCounts = {}, selectedByOS = {};
+  var optionCounts = {};
   options.forEach(function(option) {
     var os = option.split(",")[0];
-    optionCounts[os] = optionCounts[os] + 1 || 1;
+    optionCounts[os] = (optionCounts[os] || 0) + 1;
   });
+  var selectedByOS = {};
   selected.forEach(function(option) {
     var os = option.split(",")[0];
     if (!selectedByOS.hasOwnProperty(os)) { selectedByOS[os] = []; }
