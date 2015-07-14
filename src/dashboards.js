@@ -16,14 +16,45 @@ $(document).ready(function() {
         setTimeout(function() { $(event.currentTarget).find(".filter input").focus(); }, 0);
       },
     };
-    if ($this.attr("id") === "measure") { // dirty hack that adds searching by spaces to the measure selector only
+    
+    // Horrible hacks to make some very specific functionality work
+    if ($this.attr("id") === "measure") { // Measure should search as if spaces were underscores
       options.filterBehavior = "custom";
       options.filterCallback = function(element, query) {
-        var currentOption = $(element).find("label").text().toLowerCase();
+        var currentOption = $(element).find("label").text().toLowerCase(); // Get the value of the current option being filtered
         query = query.toLowerCase();
         return currentOption.indexOf(query) >= 0 || currentOption.replace(/_/g, " ").indexOf(query) >= 0 || currentOption.indexOf(query.replace(/[ _]/g, "")) >= 0;
       };
     }
+    if ($this.attr("id") === "filter-os") { // OS filter should show custom text for selections
+      options.buttonText = function(options, select) {
+        if (options.length === 0) { // None selected
+          return this.nonSelectedText;
+        } else if (this.allSelectedText  && options.length === $('option', $(select)).length && $('option', $(select)).length !== 1 && this.multiple) { // All selected
+          return this.allSelectedText + ' (' + options.length + ')';
+        } else {
+          var systems = compressOSs();
+          if (systems.length > this.numberDisplayed) { // Some selected, more than list-all threshold
+            return options.length + ' ' + this.nSelectedText;
+          } else { // Some selected, under or at list-all threshold
+            var selected = '';
+            var delimiter = this.delimiterText;
+            var listing = options.parent().parent();
+            systems.forEach(function(os) {
+              if (os.indexOf(",") >= 0) {
+                var option = listing.find('option[value="' + os + '"]');
+                selected += (option.attr('label') !== undefined ? option.attr('label') : option.text()) + delimiter;
+              } else {
+                var label = getHumanReadableOptions("os", [os])[0][1];
+                selected += label + delimiter;
+              }
+            });
+            return selected.substr(0, selected.length - 2);
+          }
+        }
+      }
+    }
+    
     if ($this.attr("title") !== undefined) {
       options.nonSelectedText = $this.attr("title");
     }
@@ -221,6 +252,7 @@ function getFilterSetsMapping(filters, comparisonName) {
 }
 
 function getHumanReadableOptions(filterName, options) {
+  var channelVersionOrder = {"nightly": 0, "aurora": 1, "beta": 2, "release": 3};
   var systemNames = {"Windows_NT": "Windows", "Darwin": "OS X"};
   var systemOrder = {"Windows_NT": 1, "Darwin": 2};
   var windowsVersionNames = {"5.0": "2000", "5.1": "XP", "5.2": "XP Pro x64", "6.0": "Vista", "6.1": "7", "6.2": "8", "6.3": "8.1", "6.4": "10 (Tech Preview)", "10.0": "10"};
@@ -309,7 +341,56 @@ function getHumanReadableOptions(filterName, options) {
     // Add a hidden version of the option with spaces instead of underscores, to be able to search with spaces
     return options.map(function(option) { return [option, option] });
   } else if (filterName === "channelVersion") {
-    return options.map(function(option) { return [option, option.replace("/", " ")] });
+    var latest = {};
+    options.forEach(function(option) {
+      var parts = option.split("/");
+      if (!latest.hasOwnProperty(parts[0]) || (parseInt(parts[1]) > latest[parts[0]] && parseInt(parts[1]) < 70)) {
+        latest[parts[0]] = parseInt(parts[1]);
+      }
+    });
+    newOptions = Object.keys(latest).map(function(channel) { return channel + "/" + latest[channel]; }).sort(function(a, b) {
+      var parts1 = a.split("/"), parts2 = b.split("/");
+      if (parts1[0] === "OTHER") { return 1; }
+      if (parts2[0] === "OTHER") { return -1; }
+      if (channelVersionOrder.hasOwnProperty(parts1[0]) && channelVersionOrder.hasOwnProperty(parts2[0])) {
+        if (channelVersionOrder[parts1[0]] !== channelVersionOrder[parts2[0]]) {
+          return channelVersionOrder[parts1[0]] - channelVersionOrder[parts2[0]];
+        }
+        return parseInt(parts2[1]) - parseInt(parts1[1]);
+      }
+      if (channelVersionOrder.hasOwnProperty(parts1[0])) { return -1; }
+      if (channelVersionOrder.hasOwnProperty(parts2[0])) { return 1; }
+      if (parts1[0] > parts2[0]) { return 1; }
+      if (parts1[0] < parts2[0]) { return -1; }
+      return parseInt(parts2[1]) - parseInt(parts1[1]);
+    });
+    var otherOptions = options.filter(function(option) { // Filter out the latest versions for each channel
+      var parts = option.split("/");
+      return latest[parts[0]] !== parseInt(parts[1]);
+    }).sort(function(a, b) {
+      var parts1 = a.split("/"), parts2 = b.split("/");
+      if (parts1[0] === "OTHER") { return 1; }
+      if (parts2[0] === "OTHER") { return -1; }
+      if (channelVersionOrder.hasOwnProperty(parts1[0]) && channelVersionOrder.hasOwnProperty(parts2[0])) {
+        if (channelVersionOrder[parts1[0]] !== channelVersionOrder[parts2[0]]) {
+          return channelVersionOrder[parts1[0]] - channelVersionOrder[parts2[0]];
+        }
+        return parseInt(parts2[1]) - parseInt(parts1[1]);
+      }
+      if (channelVersionOrder.hasOwnProperty(parts1[0])) { return -1; }
+      if (channelVersionOrder.hasOwnProperty(parts2[0])) { return 1; }
+      if (parts1[0] > parts2[0]) { return 1; }
+      if (parts1[0] < parts2[0]) { return -1; }
+      return parseInt(parts2[1]) - parseInt(parts1[1]);
+    });
+    var previousChannel = null;
+    otherOptions.forEach(function(option) {
+      var channel = option.split("/")[0];
+      if (channel !== previousChannel) { newOptions.push(null); }
+      previousChannel = channel;
+      newOptions.push(option);
+    });
+    return newOptions.map(function(option) { return option !== null ? [option, option.replace("/", " ")] : null; });
   }
   return options.map(function(option) { return [option, option] });
 }
@@ -398,7 +479,9 @@ function multiselectSetOptions(element, options, defaultSelected) {
   defaultSelected = defaultSelected || null;
   
   if (options.length === 0) { element.empty().multiselect("rebuild"); return; }
-  var valuesMap = {}; options.forEach(function(option) { valuesMap[option[0]] = true; });
+  var valuesMap = {}; options.forEach(function(option) {
+    if (option) { valuesMap[option[0]] = true; }
+  });
   var selected = element.val() || [];
   if (!$.isArray(selected)) { selected = [selected]; } // For single selects, the value is not wrapped in an array
   selected = selected.filter(function(value) { return valuesMap.hasOwnProperty(value); }); // A list of options that are currently selected that will still be available in the new options
@@ -432,18 +515,19 @@ function multiselectSetOptions(element, options, defaultSelected) {
     }).join()).multiselect("rebuild");
   } else {
     options.forEach(function(option) {
-      if (!$.isArray(option) || option.length !== 2 || typeof option[0] !== "string" || typeof option[1] !== "string") {
-        throw "Bad options value: must be array of arrays, either each with two strings or each with three strings.";
-      }
+      if (option === null) { return; }
+      if ($.isArray(option) && option.length === 2 && typeof option[0] === "string" && typeof option[1] === "string") { return; }
+      throw "Bad options value: must be array of arrays, either each with two strings or each with three strings.";
     });
     
     element.empty().append(options.map(function(option) {
+      if (option === null) { return '<option disabled>&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;</option>'; }
       return '<option value="' + option[0] + '">' + option[1] + '</option>';
     }).join()).multiselect("rebuild");
   }
-  
-  element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
 
+  element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
+  
   if (useGroups) { // Make the group labels sticky to the top and bottom of the selector
     var selector = element.next().find(".multiselect-container");
     var groupHeadings = selector.find(".multiselect-group-clickable").toArray();
@@ -457,7 +541,25 @@ function multiselectSetOptions(element, options, defaultSelected) {
       topOffset += $(heading).outerHeight();
     });
     if (!wasOpen) { selector.parent().removeClass("open"); }
+    
+    $(".multiselect-container input.multiselect-search").keydown(function(event){
+      // Cause Enter to select the first visible item
+      if(event.keyCode == 13) {
+        $(this).parents("ul").find('li:not(.filter-hidden):not(.filter):first input').focus().click();
+        event.preventDefault();
+        return false;
+      }
+    });
   }
+  
+  $(".multiselect-container input.multiselect-search").keydown(function(event){
+    // Cause Enter to select the first visible item
+    if(event.keyCode == 13) {
+      $(this).parents("ul").find('li:not(.filter-hidden):not(.filter):first input').focus().click();
+      event.preventDefault();
+      return false;
+    }
+  });
 }
 
 // =========== Histogram/Evolution Dashboard-specific common code
