@@ -65,17 +65,17 @@ $(function() { Telemetry.init(function() {
       if (fromVersion.split("/")[0] !== toVersion.split("/")[0]) { // Two versions are on different channels, move the other one into the right channel
         if (e.target.id === "min-channel-version") { // min version changed, change max version to be the largest version in the current channel
           var channel = fromVersion.split("/")[0];
-          var maxChannelVersion = null;
-          var channelVersions = Telemetry.getVersions().forEach(function(version) {
-            if (version.startsWith(channel + "/")) { maxChannelVersion = version; }
+          var channelVersions = Telemetry.getVersions().filter(function(version) {
+            return version.startsWith(channel + "/") && version >= fromVersion;
           });
+          var maxChannelVersion = channelVersions[Math.min(channelVersions.length - 1, 3)];
           $("#max-channel-version").multiselect("select", maxChannelVersion);
         } else { // max version changed, change the min version to be the smallest version in the current channel
           var channel = toVersion.split("/")[0];
-          var minChannelVersion = null;
-          var channelVersions = Telemetry.getVersions().forEach(function(version) {
-            if (minChannelVersion === null && version.startsWith(channel + "/")) { minChannelVersion = version; }
+          var channelVersions = Telemetry.getVersions().filter(function(version) {
+            return version.startsWith(channel + "/") && version <= toVersion;
           });
+          var minChannelVersion = channelVersions[Math.max(0, channelVersions.length - 4)];
           $("#min-channel-version").multiselect("select", minChannelVersion);
         }
       }
