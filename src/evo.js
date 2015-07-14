@@ -271,7 +271,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   var aggregateMap = {};
   lines.forEach(function(line) { aggregateMap[line.aggregate] = true; });
   var valueLabel = Object.keys(aggregateMap).sort().join(", ") + " " + (lines.length > 0 ? lines[0].measure : "");
-  var variableLabel = useSubmissionDate ? "Submission Date" : "Build ID";
+  var variableLabel = useSubmissionDate ? "Submission Date (click to use Build ID)" : "Build ID (click to use Submission Date)";
   
   var markers = [], usedDates = {};
   lines.forEach(function(line) {
@@ -416,12 +416,16 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   });
   
   // Reposition and resize text
-  $(".mg-x-axis text, .mg-y-axis text, .mg-histogram .axis text, .mg-baselines text, .mg-active-datapoint").css("font-size", "12px");
   $(".mg-x-axis .mg-year-marker text").attr("dy", "5");
   $(".mg-x-axis .label").attr("dy", "20");
   $(".mg-y-axis .label").attr("y", "10").attr("dy", "0");
-  $(".mg-line-legend text").css("font-size", "12px")
-  $(".mg-marker-text").css("font-size", "12px").attr("text-anchor", "start").attr("dy", "18").attr("dx", "5");
+  $(".mg-marker-text").attr("text-anchor", "start").attr("dy", "18").attr("dx", "5");
+  
+  // X axis label should also be build time toggle
+  $(".mg-x-axis .label").attr("text-decoration", "underline").click(function() {
+    var newUseSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0" ? 0 : 1;
+    $("input[name=build-time-toggle][value=" + newUseSubmissionDate + "]").prop("checked", true).trigger("change");
+  });
   
   indicate();
 }
