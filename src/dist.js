@@ -333,7 +333,6 @@ function displayHistograms(histograms, dates, cumulative) {
   var starts = histograms[0].map(function(count, start, end, i) { return start; });
   var ends = histograms[0].map(function(count, start, end, i) { return end; });
   ends[ends.length - 1] = Infinity;
-  var totalCount = histograms.reduce(function(previous, histogram) { return previous + histogram.count; }, 0);
   var countsList = histograms.map(function(histogram) {
     return histogram.map(function(count, start, end, i) { return count; });
   });
@@ -345,7 +344,7 @@ function displayHistograms(histograms, dates, cumulative) {
   }
 
   var distributionSamples = countsList.map(function(counts, i) {
-    return counts.map(function(count, j) { return {value: j, count: (count / totalCount) * 100}; });
+    return counts.map(function(count, j) { return {value: j, count: (count / histograms[i].count) * 100}; });
   });
   
   // Plot the data using MetricsGraphics
@@ -414,9 +413,9 @@ function displayHistograms(histograms, dates, cumulative) {
         var count = formatNumber(countsList[d.line_id - 1][d.value]), percentage = Math.round(d.count * 100) / 100 + "%";
         var label;
         if (ends[d.value] === Infinity) {
-         label = histogram.measure + ": " + count + " samples (" + percentage + ") where sample value \u2265 " + formatNumber(cumulative ? 0 : starts[d.value]);
+         label = count + " samples (" + percentage + " of all " + histogram.measure + ") where sample value \u2265 " + formatNumber(cumulative ? 0 : starts[d.value]);
         } else {
-         label = histogram.measure + ": " + count + " samples (" + percentage + ") where " + formatNumber(cumulative ? 0 : starts[d.value]) + " \u2264 sample value < " + formatNumber(ends[d.value]);
+         label = count + " samples (" + percentage + " of all " + histogram.measure + ") where " + formatNumber(cumulative ? 0 : starts[d.value]) + " \u2264 sample value < " + formatNumber(ends[d.value]);
         }
         var legend = d3.select("#distribution .mg-active-datapoint").text(label).style("fill", "white");
         
