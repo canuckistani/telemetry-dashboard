@@ -4,7 +4,7 @@ var gFilters = null, gPreviousFilterAllSelected = {};
 
 indicate("Initializing Telemetry...");
 
-$(function() { Telemetry.init(function() {
+$(function() { Telemetry.init().then(function() {
   gFilters = {
     "application":  $("#filter-product"),
     "os":           $("#filter-os"),
@@ -110,7 +110,7 @@ $(function() { Telemetry.init(function() {
   $("#advanced-settings").on("shown.bs.collapse", function () {
     $(this).get(0).scrollIntoView({behavior: "smooth"}); // Scroll the advanced settings into view when opened
   });
-}); });
+}).catch(function(status) { alert(status); }); });
 
 function updateOptions(callback) {
   var fromVersion = $("#min-channel-version").val(), toVersion = $("#max-channel-version").val();

@@ -185,87 +185,96 @@ Telemetry.Evolution = (function() {
   return Evolution;
 })();
 
-Telemetry.getJSON = function(url, callback) { // WIP: need CORS headers in the response to do cross-origin requests - currently have cross-origin security disabled
+Telemetry.getJSON = function(url) {
   assert(typeof url === "string", "`url` must be a string");
-  assert(typeof callback === "function", "`callback` must be a function");
   if (Telemetry.CACHE[url] !== undefined) {
     if (Telemetry.CACHE[url] !== null && Telemetry.CACHE[url]._loading) { // Requested but not yet loaded
-      var xhr = Telemetry.CACHE[url];
-      var originalLoadCallback = xhr.onload, originalErrorCallback = xhr.onerror;
-      xhr.onload = function() {
-        if (this.status !== 200) { callback(null, this.status); }
-        else { callback(JSON.parse(this.responseText), null); }
-        originalLoadCallback.call(this);
-      };
-      xhr.onerror = function() {
-        callback(null, this.status);
-        originalErrorCallback.call(xhr);
-      };
-      return;
+      return new Promise(function(resolve, reject) {
+        var xhr = Telemetry.CACHE[url];
+        var originalLoadCallback = xhr.onload, originalErrorCallback = xhr.onerror;
+        xhr.onload = function() {
+          if (this.status !== 200) { reject(this.status); }
+          else { resolve(JSON.parse(this.responseText)); }
+          originalLoadCallback.call(this);
+        };
+        xhr.onerror = function() {
+          reject(this.status);
+          originalErrorCallback.call(xhr);
+        };
+      });
     } else if ((new Date).getTime() - Telemetry.CACHE_LAST_UPDATED[url] < Telemetry.CACHE_TIMEOUT) { // In cache and hasn't expired
-      setTimeout(function() { callback(Telemetry.CACHE[url], Telemetry.CACHE[url] === null ? 404 : 200); }, 1);
-      return;
+      return new Promise(function(resolve, reject) {
+        setTimeout(function() {
+          if (Telemetry.CACHE[url] === null) {
+            reject(404);
+          } else {
+            resolve(Telemetry.CACHE[url]);
+          }
+        }, 1);
+      });
     }
   }
 
-  var xhr = new XMLHttpRequest();
-  xhr._loading = true;
-  Telemetry.CACHE[url] = xhr; // Mark the URL as being requested but not yet loaded
-  xhr.onload = function() {
-    this._loading = false;
-    if (this.status === 404) { // Cache the null result if the URL resolves to a resource or missing resource
-      Telemetry.CACHE[url] = null; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
-    }
-    if (this.status !== 200) { callback(null, this.status); return; }
-    var result = JSON.parse(this.responseText);
-    Telemetry.CACHE[url] = result; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
-    callback(result, this.status);
-  };
-  xhr.onerror = function() { // Network-level error, notify the callback
-    this._loading = false;
-    callback(null, this.status);
-  };
-  xhr.open("get", url, true);
-  xhr.send();
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    xhr._loading = true;
+    Telemetry.CACHE[url] = xhr; // Mark the URL as being requested but not yet loaded
+    xhr.onload = function() {
+      this._loading = false;
+      if (this.status === 404) { // Cache the null result if the URL resolves to a resource or missing resource
+        Telemetry.CACHE[url] = null; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
+      }
+      if (this.status !== 200) { reject(this.status); return; }
+      var result = JSON.parse(this.responseText);
+      Telemetry.CACHE[url] = result; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
+      resolve(result);
+    };
+    xhr.onerror = function() { // Network-level error, notify of failure
+      this._loading = false;
+      resolve(this.status);
+    };
+    xhr.open("get", url, true);
+    xhr.send();
+  });
 }
 
-Telemetry.init = function Telemetry_init(callback) {
-  assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/", function(channels) {
-    var loadedChannels = 0, expectedChannels = channels.length * 2;
-    Telemetry.CHANNEL_VERSION_BUILDIDS = {};
-    Telemetry.CHANNEL_VERSION_DATES = {};
-    channels.forEach(function(channel, i) {
-      var versionBuildIds = Telemetry.CHANNEL_VERSION_BUILDIDS[channel] = {};
-      Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/dates/", function(buildIdEntries) {
-        buildIdEntries.forEach(function(entry) {
-          if (!versionBuildIds.hasOwnProperty(entry.version)) { versionBuildIds[entry.version] = []; }
-          versionBuildIds[entry.version].push(entry.date);
-        })
-        loadedChannels ++; // Loaded another channel's dates
-        if (loadedChannels == expectedChannels) { callback(); } // This is the last channel that needs to be loaded
+Telemetry.init = function Telemetry_init() {
+  return new Promise(function(resolve, reject) {
+    Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/").then(function(channels) {
+      var loadedChannels = 0, expectedChannels = channels.length * 2;
+      Telemetry.CHANNEL_VERSION_BUILDIDS = {};
+      Telemetry.CHANNEL_VERSION_DATES = {};
+      channels.forEach(function(channel, i) {
+        var versionBuildIds = Telemetry.CHANNEL_VERSION_BUILDIDS[channel] = {};
+        Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/dates/").then(function(buildIdEntries) {
+          buildIdEntries.forEach(function(entry) {
+            if (!versionBuildIds.hasOwnProperty(entry.version)) { versionBuildIds[entry.version] = []; }
+            versionBuildIds[entry.version].push(entry.date);
+          });
+          loadedChannels ++; // Loaded another channel's dates
+          if (loadedChannels == expectedChannels) { resolve(null); } // This is the last channel that needs to be loaded
+        }).catch(function(status) { reject(status); });
+        
+        var versionDates = Telemetry.CHANNEL_VERSION_DATES[channel] = {};
+        Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/submission_date/channels/" + channel + "/dates/").then(function(dateEntries) {
+          dateEntries.forEach(function(entry) {
+            if (!versionDates.hasOwnProperty(entry.version)) { versionDates[entry.version] = []; }
+            versionDates[entry.version].push(entry.date);
+          })
+          loadedChannels ++; // Loaded another channel's dates
+          if (loadedChannels == expectedChannels) { resolve(null); } // This is the last channel that needs to be loaded
+        }).catch(function(status) { reject(status); });
       });
-      
-      var versionDates = Telemetry.CHANNEL_VERSION_DATES[channel] = {};
-      Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/submission_date/channels/" + channel + "/dates/", function(dateEntries) {
-        dateEntries.forEach(function(entry) {
-          if (!versionDates.hasOwnProperty(entry.version)) { versionDates[entry.version] = []; }
-          versionDates[entry.version].push(entry.date);
-        })
-        loadedChannels ++; // Loaded another channel's dates
-        if (loadedChannels == expectedChannels) { callback(); } // This is the last channel that needs to be loaded
-      });
-    });
+    }).catch(function(status) { alert(status); });
   });
 },
 
-Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metric, filters, useSubmissionDate, callback) {
+Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metric, filters, useSubmissionDate) {
   assert(Telemetry.CHANNEL_VERSION_DATES !== null && Telemetry.CHANNEL_VERSION_BUILDIDS !== null, "Telemetry.js must be initialized before use");
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof metric === "string", "`metric` must be a string");
   assert(typeof filters === "object", "`filters` must be an object");
-  assert(typeof callback === "function", "`callback` must be a function");
   var buildDates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES[channel][version]
                                       : Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version]).join(",");
   var filterString = "";
@@ -273,16 +282,15 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
     filterString += "&" + encodeURIComponent(filterName) + "=" + encodeURIComponent(filters[filterName]);
   });
   var variable = useSubmissionDate ? "submission_date" : "build_id";
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel +
-    "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(buildDates) +
-    "&metric=" + encodeURIComponent(metric) + filterString, function(histograms, status) {
-    if (histograms === null) {
-      assert(status === 404, "Could not obtain evolution"); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
-      callback(null);
-    } else {
-      var evolution = new Telemetry.Evolution(histograms.buckets, histograms.data, histograms.kind, histograms.description, metric);
-      callback(evolution);
-    }
+  return new Promise(function(resolve, reject) {
+    Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel +
+      "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(buildDates) +
+      "&metric=" + encodeURIComponent(metric) + filterString).then(function(histograms) {
+      resolve(new Telemetry.Evolution(histograms.buckets, histograms.data, histograms.kind, histograms.description, metric));
+    }).catch(function(status) {
+      if (status === 404) { resolve(null); }
+      else { reject(status); }
+    });
   });
 }
 
@@ -290,12 +298,12 @@ Telemetry.getFilterOptions = function Telemetry_getOptions(channel, version, cal
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters", function(filterOptions) {
+  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters").then(function(filterOptions) {
     filterOptions["metric"] = filterOptions["metric"].filter(function(measure) {
       return !measure.startsWith("STARTUP_"); // Ignore STARTUP_* histograms since nobody ever uses them
     });
     callback(filterOptions);
-  });
+  }).catch(function(status) { alert(status); });
 }
 
 Telemetry.getVersions = function Telemetry_getVersions(fromVersion, toVersion) { // shim function
@@ -315,10 +323,9 @@ Telemetry.getMeasures = function Telemetry_getMeasures(channel, version, callbac
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel +
-    "/filters/metric", function(metrics) {
+  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters/metric").then(function(metrics) {
     callback(metrics);
-  });
+  }).catch(function(status) { alert(status); });;
 }
 
 exports.Telemetry = Telemetry;

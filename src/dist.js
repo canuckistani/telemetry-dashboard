@@ -5,7 +5,7 @@ var gFilters = null, gPreviousFilterAllSelected = {};
 
 indicate("Initializing Telemetry...");
 
-$(function() { Telemetry.init(function() {
+$(function() { Telemetry.init().then(function() {
   gFilters = {
     "application":  $("#filter-product"),
     "os":           $("#filter-os"),
@@ -90,7 +90,7 @@ $(function() { Telemetry.init(function() {
     $("#range-bar").outerWidth(dateControls.parent().width() - dateControls.outerWidth() - 10);
     $(this).get(0).scrollIntoView({behavior: "smooth"}); // Scroll the advanced settings into view when opened
   });
-}); });
+}).catch(function(status) { alert(status); }); });
 
 function updateOptions(callback) {
   var channelVersion = $("#channel-version").val();
@@ -125,53 +125,46 @@ function calculateHistograms(callback) {
   for (var option in filterSetsMapping) { totalFilters += filterSetsMapping[option].length; }
   
   var useSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0";
-  var fullEvolutions = [], optionValues = [];
-  var filterSetsCount = 0, totalFiltersCount = 0;
   var filterSetsMappingOptions = Object.keys(filterSetsMapping);
-  filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) {
+  indicate("Updating histograms... 0%");
+  var promises = filterSetsMappingOptions.map(function(filterSetsMappingOption, i) {
     var filterSets = filterSetsMapping[filterSetsMappingOption];
-    var filtersCount = 0, fullEvolution = null;
-    indicate("Updating histograms... 0%");
-    filterSets.forEach(function(filterSet) {
-      var parts = channelVersion.split("/");
-      Telemetry.getEvolution(parts[0], parts[1], measure, filterSet, useSubmissionDate, function(evolution) {
-        totalFiltersCount ++; filtersCount ++;
-        indicate("Updating histograms... " + Math.round(100 * totalFiltersCount / totalFilters) + "%");
-        if (fullEvolution === null) {
-          fullEvolution = evolution;
-        } else if (evolution !== null) {
-          fullEvolution = fullEvolution.combine(evolution);
-        }
-        if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
-          filterSetsCount ++;
-          if (fullEvolution !== null) {
-            fullEvolutions.push(fullEvolution);
-            optionValues.push(filterSetsMappingOption);
-          }
-          if (filterSetsCount === filterSetsMappingOptions.length) {
-            indicate();
-            updateDateRange(function(dates) {
-              if (dates == null) { // No dates in the selected range, so no histograms available
-                callback([], []);
-              } else { // Filter the evolution to include only those histograms that are in the selected range
-                var filteredEvolutions = fullEvolutions.map(function(evolution) {
-                  return evolution.dateRange(dates[0], dates[dates.length - 1]);
-                });
-                var fullHistograms = filteredEvolutions.map(function(evolution, i) {
-                  var histogram = evolution.histogram();
-                  if (comparisonName !== "") {
-                    var option = getHumanReadableOptions(comparisonName, [optionValues[i]])[0];
-                    histogram.measure = option[1];
-                  }
-                  return histogram;
-                });
-                callback(fullHistograms, filteredEvolutions);
-              }
-            }, fullEvolutions, false);
-          }
-        }
+    var filtersCount = 0;
+    return new Promise(function(resolve, reject) {
+      var promises = filterSets.map(function(filterSet) {
+        var parts = channelVersion.split("/");
+        return Telemetry.getEvolution(parts[0], parts[1], measure, filterSet, useSubmissionDate);
+      });
+      Promise.all(promises).then(function(evolutions) {
+        evolutions = evolutions.filter(function(evolution) { return evolution !== null; });
+        var fullEvolution = evolutions.length === 0 ? null : evolutions.reduce(function(previous, evolution) { return previous.combine(evolution); });
+        resolve({evolution: fullEvolution, option: filterSetsMappingOption});
       });
     });
+  });
+  
+  Promise.all(promises).then(function(entries) {
+    var fullEvolutions = entries.map(function(entry) { return entry.evolution; });
+    var optionValues = entries.map(function(entry) { return entry.option; });
+    indicate();
+    updateDateRange(function(dates) {
+      if (dates == null) { // No dates in the selected range, so no histograms available
+        callback([], []);
+      } else { // Filter the evolution to include only those histograms that are in the selected range
+        var filteredEvolutions = fullEvolutions.map(function(evolution) {
+          return evolution.dateRange(dates[0], dates[dates.length - 1]);
+        });
+        var fullHistograms = filteredEvolutions.map(function(evolution, i) {
+          var histogram = evolution.histogram();
+          if (comparisonName !== "") {
+            var option = getHumanReadableOptions(comparisonName, [optionValues[i]])[0];
+            histogram.measure = option[1];
+          }
+          return histogram;
+        });
+        callback(fullHistograms, filteredEvolutions);
+      }
+    }, fullEvolutions, false);
   });
   
   if (totalFilters === 0) { // No filters selected, so no histograms could be created
