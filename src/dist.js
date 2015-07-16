@@ -62,6 +62,17 @@ $(function() { Telemetry.init(function() {
           gPreviousFilterAllSelected[$this.attr("id")] = selected.length === options.length; // Store state
         }
 
+        // Update CSS classes for labels marking whether they are all selected
+        var allSelectedOSList = compressOSs().filter(function(os) { return os.indexOf(",") < 0; }); // List of all OSs that are all selected
+        var selector = $("#filter-os").next().find(".multiselect-container");
+        selector.find(".multiselect-group-clickable").removeClass("all-selected");
+        var optionsMap = {};
+        getHumanReadableOptions("os", allSelectedOSList).forEach(function(option) { optionsMap[option[0]] = option[1]; });
+        allSelectedOSList.forEach(function(os) {
+          var optionGroupLabel = selector.find(".multiselect-group-clickable:contains('" + optionsMap[os] + "')");
+          optionGroupLabel.addClass("all-selected");
+        });
+        
         calculateHistograms(function(histograms, evolutions) {
           $("#measure-description").text(evolutions.length === 0 ? $("#measure").val() : evolutions[0].description);
           gCurrentHistograms = histograms; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
@@ -178,7 +189,7 @@ function calculateHistograms(callback) {
     indicate();
     updateDateRange(function(dates) {
       callback([], []);
-    }, null, false);
+    }, [], false);
   }
 }
 
@@ -505,7 +516,7 @@ function saveStateToUrlAndCookie() {
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
   if (url !== stateString) {
-    window.location.replace(window.location.origin + window.location.pathname + "#" + stateString);
+    window.location.replace(window.location.origin + window.location.pathname + "#" + encodeURI(stateString));
     $(".permalink-control input").hide(); // Hide the permalink box again since the URL changed
   }
 

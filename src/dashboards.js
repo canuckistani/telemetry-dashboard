@@ -434,6 +434,21 @@ function multiselectSetOptions(element, options, defaultSelected) {
   }
   
   element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
+
+  if (useGroups) { // Make the group labels sticky to the top and bottom of the selector
+    var selector = element.next().find(".multiselect-container");
+    var groupHeadings = selector.find(".multiselect-group-clickable").toArray();
+    var wasOpen = selector.parent().hasClass("open");
+    selector.parent().addClass("open");
+    var topOffset = selector.find(".filter").outerHeight() + 10;
+    var bottomOffset = groupHeadings.reduce(function(height, heading) { return height + $(heading).outerHeight(); }, 0);
+    groupHeadings.forEach(function(heading, i) {
+      bottomOffset -= $(heading).outerHeight();
+      $(heading).css("position", "sticky").css("z-index", "1").css("bottom", bottomOffset).css("top", topOffset).css("background", "white");
+      topOffset += $(heading).outerHeight();
+    });
+    if (!wasOpen) { selector.parent().removeClass("open"); }
+  }
 }
 
 // =========== Histogram/Evolution Dashboard-specific common code

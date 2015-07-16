@@ -98,6 +98,17 @@ $(function() { Telemetry.init(function() {
           gPreviousFilterAllSelected[$this.attr("id")] = selected.length === options.length; // Store state
         }
         
+        // Update CSS classes for labels marking whether they are all selected
+        var allSelectedOSList = compressOSs().filter(function(os) { return os.indexOf(",") < 0; }); // List of all OSs that are all selected
+        var selector = $("#filter-os").next().find(".multiselect-container");
+        selector.find(".multiselect-group-clickable").removeClass("all-selected");
+        var optionsMap = {};
+        getHumanReadableOptions("os", allSelectedOSList).forEach(function(option) { optionsMap[option[0]] = option[1]; });
+        allSelectedOSList.forEach(function(os) {
+          var optionGroupLabel = selector.find(".multiselect-group-clickable:contains('" + optionsMap[os] + "')");
+          optionGroupLabel.addClass("all-selected");
+        });
+        
         calculateEvolutions(function(lines, submissionLines, evolutionDescription) {
           $("#submissions-title").text($("#measure").val() + " submissions");
           $("#measure-description").text(evolutionDescription === null ? $("#measure").val() : evolutionDescription);
@@ -285,6 +296,9 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   });
   for (var date in usedDates) {
     markers.push({date: new Date(parseInt(date) + 1), label: usedDates[date]}); // Need to add 1ms because the leftmost marker won't show up otherwise
+  }
+  if (markers.length > 0) {
+    markers[markers.length - 1].date = new Date(markers[markers.length - 1].date.getTime() - 2)
   }
 
   // Plot the data using MetricsGraphics
@@ -516,7 +530,7 @@ function saveStateToUrlAndCookie() {
   var url = window.location.hash;
   url = url[0] === "#" ? url.slice(1) : url;
   if (url !== stateString) {
-    window.location.replace(window.location.origin + window.location.pathname + "#" + stateString);
+    window.location.replace(window.location.origin + window.location.pathname + "#" + encodeURI(stateString));
     $(".permalink-control input").hide(); // Hide the permalink box again since the URL changed
   }
   
