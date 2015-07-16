@@ -342,7 +342,6 @@ function displayHistograms(histograms, dates, cumulative) {
     MG.data_graphic({
       chart_type: "missing-data",
       full_width: true, height: 600,
-      left: 100, right: 0,
       target: "#distribution",
     });
     $(".mg-missing-pane").remove();
@@ -375,7 +374,7 @@ function displayHistograms(histograms, dates, cumulative) {
       binned: true,
       chart_type: "histogram",
       full_width: true, height: 600,
-      left: 150, right: 150,
+      left: 150, right: $("#distribution").width() / (distributionSamples[0].length + 1) + 150,
       transition_on_update: false,
       target: "#distribution",
       x_label: histogram.description, y_label: "Percentage of Samples",
@@ -413,12 +412,19 @@ function displayHistograms(histograms, dates, cumulative) {
         d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
       },
     });
+    
+    // Extend the Y axis ticks to cover the last bucket
+    var barWidth = parseFloat($("#distribution .mg-rollover-rects:last-child rect").attr("width"))
+    $("#distribution .mg-extended-y-ticks").each(function(i, yTick) {
+      var x2 = parseFloat(yTick.attributes.x2.value) + barWidth;
+      yTick.setAttribute("x2", x2);
+    });
   } else { // Multiple histograms available, display as overlaid lines
     MG.data_graphic({
       data: distributionSamples,
       chart_type: "line",
       full_width: true, height: 600,
-      left: 100, right: 150,
+      left: 150, right: 150,
       transition_on_update: false,
       target: "#distribution",
       x_label: histograms[0].description, y_label: "Percentage of Samples",
