@@ -309,6 +309,7 @@ function displayHistograms(histograms, dates, cumulative) {
     $("#prop-date-range").text(moment.utc(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment.utc(dates[dates.length - 1]).format("YYYY/MM/DD")));
     $("#prop-submissions").text(formatNumber(histogram.submissions));
     $("#prop-count").text(formatNumber(histogram.count));
+    $("#prop-sum").text(formatNumber(histogram.sum));
     if (histogram.kind == "linear" || histogram.kind == "exponential") {
       $("#prop-p5").text(formatNumber(histogram.percentile(5)));
       $("#prop-p25").text(formatNumber(histogram.percentile(25)));

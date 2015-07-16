@@ -16,11 +16,12 @@ var Telemetry = {
 var urlCallbacks = {}
 
 Telemetry.Histogram = (function() {
-  function Histogram(buckets, values, kind, submissions, description, measure) {
+  function Histogram(buckets, values, kind, submissions, sum, description, measure) {
     assert(typeof buckets[0] === "number", "`buckets` must be an array");
     assert(typeof values[0] === "number", "`values` must be an array");
     assert(["flag", "boolean", "count", "enumerated", "linear", "exponential"].indexOf(kind) >= 0, "`kind` must be a valid histogram kind");
     assert(typeof submissions === "number", "`submissions` must be a number");
+    assert(typeof sum === "number", "`sum` must be a number");
     assert(typeof description === "string", "`description` must be a string");
     assert(typeof measure === "string", "`measure` must be a string");
     this.buckets = buckets;
@@ -29,8 +30,9 @@ Telemetry.Histogram = (function() {
     this.count = this.values.reduce(function(previous, count) { return previous + count; }, 0);
     this.kind = kind;
     this.submissions = submissions;
+    this.sum = sum;
     this.description = description;
-    this.measure = measure
+    this.measure = measure;
   }
   
   Histogram.prototype.lastBucketUpper = function() {
@@ -131,6 +133,7 @@ Telemetry.Evolution = (function() {
       return {
         date: date,
         count: entries.reduce(function(previous, entry) { return previous + entry.count }, 0),
+        sum: entries.reduce(function(previous, entry) { return previous + entry.sum }, 0),
         label: entries[0].label,
         histogram: histogram,
       };
@@ -153,19 +156,20 @@ Telemetry.Evolution = (function() {
   
   Evolution.prototype.histogram = function() {
     var submissions = this.data.reduce(function(submissions, entry) { return submissions + entry.count; }, 0);
+    var sum = this.data.reduce(function(sum, entry) { return sum + entry.sum; }, 0);
     var values = this.data.reduce(function(values, entry) {
       entry.histogram.forEach(function(count, i) { values[i] = (values[i] || 0) + count; });
       return values;
     }, []);
     
-    return new Telemetry.Histogram(this.buckets, values, this.kind, submissions, this.description, this.measure);
+    return new Telemetry.Histogram(this.buckets, values, this.kind, submissions, sum, this.description, this.measure);
   };
   
   Evolution.prototype.map = function(callback) {
     var evolution = this;
     return this.data.sort(function(a, b) { return parseInt(a.date) - parseInt(b.date); })
       .map(function(entry, i) {
-      var histogram = new Telemetry.Histogram(evolution.buckets, entry.histogram, evolution.kind, entry.count, evolution.description, evolution.measure);
+      var histogram = new Telemetry.Histogram(evolution.buckets, entry.histogram, evolution.kind, entry.count, entry.sum, evolution.description, evolution.measure);
       return callback.call(evolution, histogram, i);
     });
   };
