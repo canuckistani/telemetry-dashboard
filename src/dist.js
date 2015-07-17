@@ -352,20 +352,20 @@ function displayHistograms(histogramsList, dates, cumulative) {
       $(axes).parent().parent().show();
       var entry = histogramsList[i] || null;
       if (entry !== null) {
-        displaySingleHistogramSet(axes, entry.histograms, axesList.length, entry.title, cumulative);
+        displaySingleHistogramSet(axes, entry.histograms, entry.title, cumulative);
       } else {
-        displaySingleHistogramSet(axes, [], axesList.length, null, cumulative);
+        displaySingleHistogramSet(axes, [], null, cumulative);
       }
     });
   }
 }
 
-function displaySingleHistogramSet(axes, histograms, histogramsCount, title, cumulative) {
+function displaySingleHistogramSet(axes, histograms, title, cumulative) {
   // No histograms available
   if (histograms.length === 0) {
     MG.data_graphic({
       chart_type: "missing-data",
-      full_width: true, height: histogramsCount > 1 ? 300 : 600,
+      full_width: true, height: $(axes).width() * 0.4,
       target: axes,
     });
     $(axes).find(".mg-missing-pane").remove();
@@ -397,7 +397,7 @@ function displaySingleHistogramSet(axes, histograms, histogramsCount, title, cum
       data: distributionSamples[0],
       binned: true,
       chart_type: "histogram",
-      full_width: true, height: histogramsCount > 1 ? 300 : 600,
+      full_width: true, height: $(axes).width() * 0.4,
       left: 150, right: $(axes).width() / (distributionSamples[0].length + 1) + 150,
       transition_on_update: false,
       target: axes,
