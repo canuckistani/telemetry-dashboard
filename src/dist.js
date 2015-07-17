@@ -260,7 +260,7 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
     picker.setStartDate(minMoment.clone().local());
     picker.setEndDate(maxMoment.clone().local());
     pickerStartDate = minMoment;
-    pickerEndDate = maxMoment;
+    pickerEndDate = maxMoment.clone().add(1, "days").subtract(1, "milliseconds");
   }
   gPreviousMinMoment = minMoment; gPreviousMaxMoment = maxMoment;
   
@@ -288,7 +288,7 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
     $("#range-bar").empty().append(rangeBarControl.$el);
     var dateControls = $("#date-range-controls");
     $("#range-bar").outerWidth(dateControls.parent().width() - dateControls.outerWidth() - 10);
-    rangeBarControl.val([[pickerStartDate, pickerEndDate]]);
+    rangeBarControl.val([[pickerStartDate.toDate(), pickerEndDate.toDate()]]);
   }
   
   var min = pickerStartDate.toDate(), max = pickerEndDate.toDate();
