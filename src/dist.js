@@ -1,6 +1,6 @@
 var gInitialPageState = null;
 var gFilterChangeTimeout = null;
-var gCurrentHistograms = null; gCurrentDates = null;
+var gCurrentHistogramsList = null; gCurrentDates = null;
 var gFilters = null, gPreviousFilterAllSelected = {};
 
 indicate("Initializing Telemetry...");
@@ -75,8 +75,10 @@ $(function() { Telemetry.init(function() {
         
         calculateHistograms(function(histograms, evolutions) {
           $("#measure-description").text(evolutions.length === 0 ? $("#measure").val() : evolutions[0].description);
-          gCurrentHistograms = histograms; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
-          displayHistograms(histograms, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
+          var histogramsList = [{title: "AAA", histograms: histograms}, {title: "BBB", histograms: histograms}];
+          var histogramsList = [{title: "AAA", histograms: histograms}];
+          gCurrentHistogramsList = histogramsList; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
+          displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         });
       }, 0);
@@ -87,7 +89,7 @@ $(function() { Telemetry.init(function() {
   });
 
   $("input[name=cumulative-toggle]").change(function() {
-    displayHistograms(gCurrentHistograms, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
+    displayHistograms(gCurrentHistogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
     saveStateToUrlAndCookie();
   });
   
@@ -281,7 +283,7 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
       if (gLastTimeoutID !== null) { clearTimeout(gLastTimeoutID); }
       gLastTimeoutID = setTimeout(function() { // Debounce slider movement callback
         picker.setStartDate(moment.utc(range[0]).local());
-        picker.setEndDate(moment.utc(range[1]).subtract(1, "days").local());
+        picker.setEndDate(moment.utc(range[1]).local().subtract(1, "days"));
         updateDateRange(gCurrentDateRangeUpdateCallback, evolutions, true, false);
       }, 50);
     });
@@ -310,41 +312,63 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
   gCurrentDateRangeUpdateCallback(dates);
 }
 
-function displayHistograms(histograms, dates, cumulative) {
+function displayHistograms(histogramsList, dates, cumulative) {
   cumulative = cumulative || false;
-
-  if (histograms.length === 1) { // Only one histogram, show a summary
-    var histogram = histograms[0];
-    $("#prop-kind").text(histogram.kind);
-    $("#prop-dates").text(formatNumber(dates.length));
-    $("#prop-date-range").text(moment.utc(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment.utc(dates[dates.length - 1]).format("YYYY/MM/DD")));
-    $("#prop-submissions").text(formatNumber(histogram.submissions));
-    $("#prop-count").text(formatNumber(histogram.count));
-    $("#prop-sum").text(formatNumber(histogram.sum));
-    if (histogram.kind == "linear" || histogram.kind == "exponential") {
-      $("#prop-p5").text(formatNumber(histogram.percentile(5)));
-      $("#prop-p25").text(formatNumber(histogram.percentile(25)));
-      $("#prop-p50").text(formatNumber(histogram.percentile(50)));
-      $("#prop-p75").text(formatNumber(histogram.percentile(75)));
-      $("#prop-p95").text(formatNumber(histogram.percentile(95)));
-      $(".scalar-only").show();
+  var axesList = [$("#distribution1").get(0), $("#distribution2").get(0), $("#distribution3").get(0), $("#distribution4").get(0)];
+  
+  if (histogramsList.length === 1) { // Only one histograms set
+    if (histogramsList[0].histograms.length === 1) { // Only one histogram in histograms set
+      var histogram = histogramsList[0].histograms[0];
+      $("#prop-kind").text(histogram.kind);
+      $("#prop-dates").text(formatNumber(dates.length));
+      $("#prop-date-range").text(moment.utc(dates[0]).format("YYYY/MM/DD") + ((dates.length == 1) ? "" : " to " + moment.utc(dates[dates.length - 1]).format("YYYY/MM/DD")));
+      $("#prop-submissions").text(formatNumber(histogram.submissions));
+      $("#prop-count").text(formatNumber(histogram.count));
+      $("#prop-sum").text(formatNumber(histogram.sum));
+      if (histogram.kind == "linear" || histogram.kind == "exponential") {
+        $("#prop-p5").text(formatNumber(histogram.percentile(5)));
+        $("#prop-p25").text(formatNumber(histogram.percentile(25)));
+        $("#prop-p50").text(formatNumber(histogram.percentile(50)));
+        $("#prop-p75").text(formatNumber(histogram.percentile(75)));
+        $("#prop-p95").text(formatNumber(histogram.percentile(95)));
+        $(".scalar-only").show();
+      } else {
+        $(".scalar-only").hide();
+      }
+      $("#summary").show();
     } else {
-      $(".scalar-only").hide();
+      $("#summary").hide();
     }
-    $("#summary").show();
+    
+    $("#distribution").parent().parent().show();
+    axesList.forEach(function(axes, i) { $(axes).parent().parent().hide(); });
+    displaySingleHistogramSet($("#distribution").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
   }
-  else {
+  else { // Multiple histograms, each one keyed
     $("#summary").hide();
+    
+    $("#distribution").parent().parent().hide();
+    axesList.forEach(function(axes, i) {
+      $(axes).parent().parent().show();
+      var entry = histogramsList[i] || null;
+      if (entry !== null) {
+        displaySingleHistogramSet(axes, entry.histograms, axesList.length, entry.title, cumulative);
+      } else {
+        displaySingleHistogramSet(axes, [], axesList.length, null, cumulative);
+      }
+    });
   }
+}
 
+function displaySingleHistogramSet(axes, histograms, histogramsCount, title, cumulative) {
   // No histograms available
   if (histograms.length === 0) {
     MG.data_graphic({
       chart_type: "missing-data",
-      full_width: true, height: 600,
-      target: "#distribution",
+      full_width: true, height: histogramsCount > 1 ? 300 : 600,
+      target: axes,
     });
-    $(".mg-missing-pane").remove();
+    $(axes).find(".mg-missing-pane").remove();
     return;
   }
   
@@ -373,10 +397,10 @@ function displayHistograms(histograms, dates, cumulative) {
       data: distributionSamples[0],
       binned: true,
       chart_type: "histogram",
-      full_width: true, height: 600,
-      left: 150, right: $("#distribution").width() / (distributionSamples[0].length + 1) + 150,
+      full_width: true, height: histogramsCount > 1 ? 300 : 600,
+      left: 150, right: $(axes).width() / (distributionSamples[0].length + 1) + 150,
       transition_on_update: false,
-      target: "#distribution",
+      target: axes,
       x_label: histogram.description, y_label: "Percentage of Samples",
       xax_ticks: 20,
       y_extended_ticks: true,
@@ -392,30 +416,30 @@ function displayHistograms(histograms, dates, cumulative) {
          label = histogram.measure + ": " + count + " samples (" + percentage + ") where " + formatNumber(cumulative ? 0 : starts[d.x]) + " \u2264 sample value < " + formatNumber(ends[d.x]);
         }
 
-        var offset = $("#distribution .mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
-        var barWidth = $("#distribution .mg-bar:nth-child(" + (i + 1) + ") rect").get(0).getAttribute("width");
+        var offset = $(axes).find(".mg-bar:nth-child(" + (i + 1) + ")").get(0).getAttribute("transform");
+        var barWidth = $(axes).find(".mg-bar:nth-child(" + (i + 1) + ") rect").get(0).getAttribute("width");
         
         // Reposition element
-        var legend = d3.select("#distribution .mg-active-datapoint").text(label).attr("transform", offset)
+        var legend = d3.select(axes).select(".mg-active-datapoint").text(label).attr("transform", offset)
           .attr("x", barWidth / 2).attr("y", "0").attr("dy", "-10").attr("text-anchor", "middle").style("fill", "white");
         var bbox = legend[0][0].getBBox();
         var padding = 5;
         
         // Add background
-        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
-        d3.select("#distribution svg").insert("rect", ".mg-active-datapoint").classed("active-datapoint-background", true)
+        d3.select(axes).select(".active-datapoint-background").remove(); // Remove old background
+        d3.select(axes).select("svg").insert("rect", ".mg-active-datapoint").classed("active-datapoint-background", true)
           .attr("x", bbox.x - padding).attr("y", bbox.y - padding).attr("transform", offset)
           .attr("width", bbox.width + padding * 2).attr("height", bbox.height + padding * 2)
           .attr("rx", "3").attr("ry", "3").style("fill", "#333");
       },
       mouseout: function(d, i) {
-        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
+        d3.select(axes).select(".active-datapoint-background").remove(); // Remove old background
       },
     });
     
     // Extend the Y axis ticks to cover the last bucket
-    var barWidth = parseFloat($("#distribution .mg-rollover-rects:last-child rect").attr("width"))
-    $("#distribution .mg-extended-y-ticks").each(function(i, yTick) {
+    var barWidth = parseFloat($(axes).find(".mg-rollover-rects:last-child rect").attr("width"))
+    $(axes).find(".mg-extended-y-ticks").each(function(i, yTick) {
       var x2 = parseFloat(yTick.attributes.x2.value) + barWidth;
       yTick.setAttribute("x2", x2);
     });
@@ -426,7 +450,7 @@ function displayHistograms(histograms, dates, cumulative) {
       full_width: true, height: 600,
       left: 150, right: 150,
       transition_on_update: false,
-      target: "#distribution",
+      target: axes,
       x_label: histograms[0].description, y_label: "Percentage of Samples",
       xax_ticks: 20,
       y_extended_ticks: true,
@@ -434,7 +458,7 @@ function displayHistograms(histograms, dates, cumulative) {
       xax_format: function(index) { return formatNumber(starts[index]); },
       yax_format: function(value) { return value + "%"; },
       mouseover: function(d, i) {
-        var rolloverCircle = $("#distribution .mg-line-rollover-circle.mg-area" + d.line_id + "-color").get(0);
+        var rolloverCircle = $(axes).find(".mg-line-rollover-circle.mg-area" + d.line_id + "-color").get(0);
         var histogram = histograms[d.line_id - 1];
         var count = formatNumber(countsList[d.line_id - 1][d.value]), percentage = Math.round(d.count * 100) / 100 + "%";
         var label;
@@ -443,38 +467,38 @@ function displayHistograms(histograms, dates, cumulative) {
         } else {
          label = count + " samples (" + percentage + " of all " + histogram.measure + ") where " + formatNumber(cumulative ? 0 : starts[d.value]) + " \u2264 sample value < " + formatNumber(ends[d.value]);
         }
-        var legend = d3.select("#distribution .mg-active-datapoint").text(label).style("fill", "white");
+        var legend = d3.select(axes).select(".mg-active-datapoint").text(label).style("fill", "white");
         
         // Reposition element
         var x = parseInt(rolloverCircle.getAttribute("cx")) + 20, y = 40;
         var bbox = legend[0][0].getBBox();
-        if (x + bbox.width + 50 > $("#distribution svg").width()) x -= bbox.width + 40;
-        d3.select("#distribution .mg-active-datapoint-container").attr("transform", "translate(" + (x + bbox.width) + "," + (y + 15) + ")");
+        if (x + bbox.width + 50 > $(axes).find("svg").width()) x -= bbox.width + 40;
+        d3.select(axes).select(".mg-active-datapoint-container").attr("transform", "translate(" + (x + bbox.width) + "," + (y + 15) + ")");
         
         // Add background
         var padding = 10;
-        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
-        d3.select("#distribution svg").insert("rect", ".mg-active-datapoint-container").classed("active-datapoint-background", true)
+        d3.select(axes).select(".active-datapoint-background").remove(); // Remove old background
+        d3.select(axes).select("svg").insert("rect", ".mg-active-datapoint-container").classed("active-datapoint-background", true)
           .attr("x", x - padding).attr("y", y)
           .attr("width", bbox.width + padding * 2).attr("height", bbox.height + 8)
           .attr("rx", "3").attr("ry", "3").style("fill", "#333");
       },
       mouseout: function(d, i) {
-        d3.select("#distribution .active-datapoint-background").remove(); // Remove old background
+        d3.select(axes).select(".active-datapoint-background").remove(); // Remove old background
       },
     });
   }
   
     // Reposition and resize text
-  $(".mg-x-axis .label").attr("dy", "1.2em");
-  $(".mg-x-axis text:not(.label)").each(function(i, text) { // Axis tick labels
+  $(axes).find(".mg-x-axis .label").attr("dy", "1.2em");
+  $(axes).find(".mg-x-axis text:not(.label)").each(function(i, text) { // Axis tick labels
     if ($(text).text() === "NaN") { text.parentNode.removeChild(text); } // Remove "NaN" labels resulting from interpolation in histogram labels
     $(text).attr("dx", "0.3em").attr("dy", "0").attr("text-anchor", "start");
   });
-  $(".mg-x-axis line").each(function(i, tick) { // Extend axis ticks to 15 pixels
+  $(axes).find(".mg-x-axis line").each(function(i, tick) { // Extend axis ticks to 15 pixels
     $(tick).attr("y2", parseInt($(tick).attr("y1")) + 12);
   });
-  $(".mg-y-axis .label").attr("y", "55").attr("dy", "0");
+  $(axes).find(".mg-y-axis .label").attr("y", "55").attr("dy", "0");
 }
 
 // Save the current state to the URL and the page cookie
@@ -537,15 +561,15 @@ function saveStateToUrlAndCookie() {
   $("#switch-views").attr("href", dashboardURL);
   
   // Update export links with the new histogram
-  if (gCurrentHistograms.length === 1) { // wip: remove this
+  if (gCurrentHistogramsList.length > 0 && gCurrentHistogramsList[0].length === 1) { // wip: remove this
     if (gPreviousCSVBlobUrl !== null) { URL.revokeObjectURL(gPreviousCSVBlobUrl); }
     if (gPreviousJSONBlobUrl !== null) { URL.revokeObjectURL(gPreviousJSONBlobUrl); }
-    var csvValue = "start,\tcount\n" + gCurrentHistograms[0].map(function (count, start, end, i) { return start + ",\t" + count; }).join("\n");
-    var jsonValue = JSON.stringify(gCurrentHistograms[0].map(function(count, start, end, i) { return {start: start, count: count} }));
+    var csvValue = "start,\tcount\n" + gCurrentHistogramsList[0].map(function (count, start, end, i) { return start + ",\t" + count; }).join("\n");
+    var jsonValue = JSON.stringify(gCurrentHistogramsList[0].map(function(count, start, end, i) { return {start: start, count: count} }));
     gPreviousCSVBlobUrl = URL.createObjectURL(new Blob([csvValue]));
     gPreviousJSONBlobUrl = URL.createObjectURL(new Blob([jsonValue]));
-    $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistograms[0].measure + ".csv");
-    $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistograms[0].measure + ".json");
+    $("#export-csv").attr("href", gPreviousCSVBlobUrl).attr("download", gCurrentHistogramsList[0][0].measure + ".csv");
+    $("#export-json").attr("href", gPreviousJSONBlobUrl).attr("download", gCurrentHistogramsList[0][0].measure + ".json");
   } else {
     $("#export-csv, #export-json").hide();
   }
