@@ -316,7 +316,7 @@ Telemetry.getFilterOptions = function Telemetry_getOptions(channel, version, cal
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters", function(filterOptions) {
+  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters/", function(filterOptions) {
     filterOptions["metric"] = filterOptions["metric"].filter(function(measure) {
       return !measure.startsWith("STARTUP_"); // Ignore STARTUP_* histograms since nobody ever uses them
     });
