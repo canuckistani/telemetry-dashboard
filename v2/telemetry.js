@@ -2,7 +2,7 @@
 "use strict";
 
 function assert(condition, message) {
-  if (!condition) { throw message || "Assertion failed"; }
+  if (!condition) { throw message === undefined ? "Assertion failed" : message; }
   return condition;
 }
 
@@ -189,7 +189,7 @@ Telemetry.Evolution = (function() {
   return Evolution;
 })();
 
-Telemetry.getJSON = function(url, callback) { // WIP: need CORS headers in the response to do cross-origin requests - currently have cross-origin security disabled
+Telemetry.getJSON = function(url, callback) {
   assert(typeof url === "string", "`url` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
   if (Telemetry.CACHE[url] !== undefined) {
@@ -216,17 +216,21 @@ Telemetry.getJSON = function(url, callback) { // WIP: need CORS headers in the r
   xhr._loading = true;
   Telemetry.CACHE[url] = xhr; // Mark the URL as being requested but not yet loaded
   xhr.onload = function() {
-    this._loading = false;
-    if (this.status === 404) { // Cache the null result if the URL resolves to a resource or missing resource
-      Telemetry.CACHE[url] = null; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
+    if (this.status !== 200) {
+      if (this.status === 404) { // Cache the null result if the URL resolves to a resource or missing resource
+        Telemetry.CACHE[url] = null; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
+      } else { // Result was invalid, remove the current request from the cache
+        delete Telemetry.CACHE[url];
+      }
+      callback(null, this.status);
+    } else { // Request was successful
+      var result = JSON.parse(this.responseText);
+      Telemetry.CACHE[url] = result; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
+      callback(result, this.status);
     }
-    if (this.status !== 200) { callback(null, this.status); return; }
-    var result = JSON.parse(this.responseText);
-    Telemetry.CACHE[url] = result; Telemetry.CACHE_LAST_UPDATED[url] = (new Date).getTime();
-    callback(result, this.status);
   };
   xhr.onerror = function() { // Network-level error, notify the callback
-    this._loading = false;
+    delete Telemetry.CACHE[url];
     callback(null, this.status);
   };
   xhr.open("get", url, true);
