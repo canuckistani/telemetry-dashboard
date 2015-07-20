@@ -76,7 +76,6 @@ $(function() { Telemetry.init(function() {
         calculateHistograms(function(histograms, evolutions) {
           $("#measure-description").text(evolutions.length === 0 ? $("#measure").val() : evolutions[0].description);
           var histogramsList = [{title: "AAA", histograms: histograms}, {title: "BBB", histograms: histograms}];
-          var histogramsList = [{title: "AAA", histograms: histograms}];
           gCurrentHistogramsList = histogramsList; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
           displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
@@ -133,54 +132,65 @@ function calculateHistograms(callback) {
   var measure = $("#measure").val();
   
   var comparisonName = $("#compare").val();
-  var filterSetsMapping = getFilterSetsMapping(gFilters, comparisonName !== "" ? comparisonName : null);
+  var filterSetsMapping = getFilterSetsMapping(gFilters, comparisonName !== "" ? comparisonName : null); // Mapping from option values to lists of filter sets
   var totalFilters = 0;
   for (var option in filterSetsMapping) { totalFilters += filterSetsMapping[option].length; }
   
   var useSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0";
-  var fullEvolutions = [], optionValues = [];
+  var fullEvolutionsMap = {}; // Mapping from labels (the keys in keyed histograms) to lists of combined filtered evolutions (one per comparison option, combined from all filter sets in that option)
+  var optionValues = []; // List of options in the order that they were done being processed, rather than the order they appeared in
   var filterSetsCount = 0, totalFiltersCount = 0;
   var filterSetsMappingOptions = Object.keys(filterSetsMapping);
   filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) {
     var filterSets = filterSetsMapping[filterSetsMappingOption];
-    var filtersCount = 0, fullEvolution = null;
+    var filtersCount = 0, fullEvolutionMap = {};
     indicate("Updating histograms... 0%");
     filterSets.forEach(function(filterSet) {
       var parts = channelVersion.split("/");
-      Telemetry.getEvolution(parts[0], parts[1], measure, filterSet, useSubmissionDate, function(evolution) {
+      Telemetry.getEvolution(parts[0], parts[1], measure, filterSet, useSubmissionDate, function(evolutionMap) {
         totalFiltersCount ++; filtersCount ++;
         indicate("Updating histograms... " + Math.round(100 * totalFiltersCount / totalFilters) + "%");
-        if (fullEvolution === null) {
-          fullEvolution = evolution;
-        } else if (evolution !== null) {
-          fullEvolution = fullEvolution.combine(evolution);
+        
+        for (var label in evolutionMap) {
+          if (fullEvolutionMap.hasOwnProperty(label)) { fullEvolutionMap[label] = fullEvolutionMap[label].combine(evolutionMap[label]); }
+          else { fullEvolutionMap[label] = evolutionMap[label]; }
         }
-        if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
+        
+        if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters in the current filter set
           filterSetsCount ++;
-          if (fullEvolution !== null) {
-            fullEvolutions.push(fullEvolution);
-            optionValues.push(filterSetsMappingOption);
+          optionValues.push(filterSetsMappingOption); // Add the current option value being compared by
+          for (var label in fullEvolutionMap) { // Make a list of evolutions for each label in the evolution
+            if (!fullEvolutionsMap.hasOwnProperty(label)) { fullEvolutionsMap[label] = []; }
+            fullEvolutionsMap[label].push(fullEvolutionMap[label]);
           }
-          if (filterSetsCount === filterSetsMappingOptions.length) {
+          if (filterSetsCount === filterSetsMappingOptions.length) { // Check if we have loaded all the filter set collections
             indicate();
+            var dates = null;
+            for (var label in fullEvolutionsMap) {
+              dates = fullEvolutionsMap[label][0].dates();
+              break;
+            }
             updateDateRange(function(dates) {
               if (dates == null) { // No dates in the selected range, so no histograms available
                 callback([], []);
               } else { // Filter the evolution to include only those histograms that are in the selected range
-                var filteredEvolutions = fullEvolutions.map(function(evolution) {
-                  return evolution.dateRange(dates[0], dates[dates.length - 1]);
-                });
-                var fullHistograms = filteredEvolutions.map(function(evolution, i) {
-                  var histogram = evolution.histogram();
-                  if (comparisonName !== "") {
-                    var option = getHumanReadableOptions(comparisonName, [optionValues[i]])[0];
-                    histogram.measure = option[1];
-                  }
-                  return histogram;
-                });
-                callback(fullHistograms, filteredEvolutions);
+                var filteredEvolutionsMap = {}, filteredHistogramsMap = {};
+                for (var label in fullEvolutionsMap) {
+                  filteredEvolutionsMap[label] = fullEvolutionsMap[label].map(function(evolution) {
+                    return evolution.dateRange(dates[0], dates[dates.length - 1]);
+                  });
+                  filteredHistogramsMap[label] = filteredEvolutionsMap[label].map(function(evolution, i) {
+                    var histogram = evolution.histogram();
+                    if (comparisonName !== "") { // We are comparing by an option value
+                      var humanReadableOption = getHumanReadableOptions(comparisonName, [optionValues[i]])[0][1];
+                      histogram.measure = humanReadableOption;
+                    }
+                    return histogram;
+                  });
+                }
+                callback(filteredHistogramsMap, filteredEvolutionsMap);
               }
-            }, fullEvolutions, false);
+            }, dates, false);
           }
         }
       });
@@ -199,34 +209,30 @@ var gLastTimeoutID = null;
 var gLoadedDateRangeFromState = false;
 var gCurrentDateRangeUpdateCallback = null;
 var gPreviousMinMoment = null, gPreviousMaxMoment = null;
-function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangebar) {
+function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) { // dates is null for when there are no evolutions
   shouldUpdateRangebar = shouldUpdateRangebar === undefined ? true : shouldUpdateRangebar;
 
   gCurrentDateRangeUpdateCallback = callback || function() {};
   
   var timezoneOffsetMinutes = (new Date).getTimezoneOffset();
-  var dates = [];
-  if (evolutions.length !== 0) {
-    var timeCutoff = moment.utc().add(1, "years").toDate().getTime();
-    dates = evolutions[0].dates().filter(function(date) { return date <= timeCutoff; }); // Cut off all dates past one year in the future
-  }
   if (dates.length === 0) {
-    if (evolutions.length === 0 || evolution[0].dates().length === 0) {
-      $("#date-range").prop("disabled", true);
-      $("#range-bar").hide();
-    }
+    $("#date-range").prop("disabled", true);
+    $("#range-bar").hide();
     gCurrentDateRangeUpdateCallback(null);
     return;
   }
+  $("#date-range").prop("disabled", false);
+  $("#range-bar").show();
   
+  var timeCutoff = moment.utc().add(1, "years").toDate().getTime();
+  if (dates[dates.length - 1] > timeCutoff) { dates = dates.filter(function(date) { return date < timeCutoff }); }
   var minMoment = moment.utc(dates[0]), maxMoment = moment.utc(dates[dates.length - 1]);
 
   // Update the start and end range and update the selection if necessary
   var picker = $("#date-range").data("daterangepicker");
   picker.setOptions({
     format: "YYYY/MM/DD",
-    minDate: minMoment,
-    maxDate: maxMoment,
+    minDate: minMoment, maxDate: maxMoment,
     showDropdowns: true,
     drops: "up", opens: "center",
     ranges: {
@@ -248,8 +254,7 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
     }
     
     // If advanced settings are not at their defaults, expand the settings pane on load
-    var fullDates = evolutions[0].dates();
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !startMoment.isSame(fullDates[0]) || !endMoment.isSame(fullDates[fullDates.length - 1])) {
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !startMoment.isSame(minMoment) || !endMoment.isSame(maxMoment)) {
       $("#advanced-settings-toggle").click();
     }
   }
@@ -294,22 +299,14 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
   }
   
   var min = pickerStartDate.toDate(), max = pickerEndDate.toDate();
-  dates = dates.filter(function(date) { return min <= date && date <= max; });
-  
-  if (dates.length == 0) {
-    if (evolutions[0].dates().length === 0) {
-      $("#date-range").prop("disabled", true);
-      $("#range-bar").hide();
-    }
+  var filteredDates = dates.filter(function(date) { return min <= date && date <= max; });
+  if (filteredDates.length == 0) {
+    $("#date-range").prop("disabled", false);
+    $("#range-bar").show();
     gCurrentDateRangeUpdateCallback(null);
-    return;
+  } else {
+    gCurrentDateRangeUpdateCallback(filteredDates);
   }
-  
-  // Enable date range controls
-  $("#date-range").prop("disabled", false);
-  $("#range-bar").show();
-  
-  gCurrentDateRangeUpdateCallback(dates);
 }
 
 function displayHistograms(histogramsList, dates, cumulative) {
@@ -498,7 +495,7 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
   $(axes).find(".mg-x-axis line").each(function(i, tick) { // Extend axis ticks to 15 pixels
     $(tick).attr("y2", parseInt($(tick).attr("y1")) + 12);
   });
-  $(axes).find(".mg-y-axis .label").attr("y", "55").attr("dy", "0");
+  $(axes).find(".mg-y-axis .label").attr("y", "90").attr("dy", "0");
 }
 
 // Save the current state to the URL and the page cookie

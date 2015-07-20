@@ -209,13 +209,12 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
   var finalEvolution = null;
   indicate("Updating evolution for " + channel + " " + version + "... 0%");
   filterSets.forEach(function(filterSet) {
-    Telemetry.getEvolution(channel, version, measure, filterSet, useSubmissionDate, function(evolution) {
+    Telemetry.getEvolution(channel, version, measure, filterSet, useSubmissionDate, function(evolutionsMap) {
       filtersCount ++;
       indicate("Updating evolution for " + channel + " " + version + "... " + Math.round(100 * filtersCount / filterSets.length) + "%");
-      if (finalEvolution === null) {
-        finalEvolution = evolution;
-      } else if (evolution !== null) {
-        finalEvolution = finalEvolution.combine(evolution);
+      if (evolutionsMap !== null) {
+        if (finalEvolution === null) { finalEvolution = evolutionsMap[""]; }
+        else { finalEvolution = finalEvolution.combine(evolutionsMap[""]); }
       }
       if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
         indicate();
@@ -281,7 +280,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     dataset.push(dataset[dataset.length - 1]); // duplicate the last point to work around a metricsgraphics bug if there are multiple datasets where one or more datasets only have one point
     return dataset;
   });
-  var aggregateLabels = lines.map(function(line) { return line.aggregate; })
+  var aggregateLabels = lines.map(function(line) { return line.aggregate; });
   
   var aggregateMap = {};
   lines.forEach(function(line) { aggregateMap[line.aggregate] = true; });
