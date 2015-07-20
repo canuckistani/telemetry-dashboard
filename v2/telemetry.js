@@ -203,7 +203,7 @@ Telemetry.getJSON = function(url, callback) {
       };
       xhr.onerror = function() {
         callback(null, this.status);
-        originalErrorCallback.call(xhr);
+        originalErrorCallback.call(this);
       };
       return;
     } else if ((new Date).getTime() - Telemetry.CACHE_LAST_UPDATED[url] < Telemetry.CACHE_TIMEOUT) { // In cache and hasn't expired
@@ -286,10 +286,18 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
     "&metric=" + encodeURIComponent(metric) + filterString, function(histograms, status) {
     if (histograms === null) {
       assert(status === 404, "Could not obtain evolution"); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
-      callback(null);
+      callback({});
     } else {
-      var evolution = new Telemetry.Evolution(histograms.buckets, histograms.data, histograms.kind, histograms.description, metric);
-      callback(evolution);
+      var entriesMap = {}; // Mapping from entry labels to a list of entries having that label
+      histograms.data.forEach(function(entry) {
+        if (!entriesMap.hasOwnProperty(entry.label)) { entriesMap[entry.label] = []; }
+        entriesMap[entry.label].push(entry);
+      });
+      var evolutionMap = {}; // Mapping from labels to evolutions for those labels
+      for (var label in entriesMap) {
+        evolutionMap[label] = new Telemetry.Evolution(histograms.buckets, entriesMap[label], histograms.kind, histograms.description, metric);
+      };
+      callback(evolutionMap);
     }
   });
 }
@@ -324,8 +332,8 @@ Telemetry.getMeasures = function Telemetry_getMeasures(channel, version, callbac
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
   Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel +
-    "/filters/metric", function(metrics) {
-    callback(metrics);
+    "/filters/metric", function(measures) {
+    callback(measures);
   });
 }
 
