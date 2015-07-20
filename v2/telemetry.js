@@ -124,7 +124,7 @@ Telemetry.Evolution = (function() {
       if (!dateMap.hasOwnProperty(histogramEntry.date)) { dateMap[histogramEntry.date] = []; }
       dateMap[histogramEntry.date].push(histogramEntry);
     });
-    var dataset = Object.keys(dateMap).sort().map(function(date) {
+    var data = Object.keys(dateMap).sort().map(function(date) {
       var entries = dateMap[date];
       var histogram = entries[0].histogram.map(function(count) { return 0; });
       entries.forEach(function(entry) { // go through each histogram entry and combine histograms
@@ -138,8 +138,26 @@ Telemetry.Evolution = (function() {
         histogram: histogram,
       };
     });
-    return new Telemetry.Evolution(this.buckets, dataset, this.kind, this.description, this.measure);
+    return new Telemetry.Evolution(this.buckets, data, this.kind, this.description, this.measure);
   };
+  
+  Evolution.prototype.sanitized = function() {
+    var maxSubmissions = 0;
+    this.data.forEach(function(entry) {
+      if (entry.count > maxSubmissions) { maxSubmissions = entry.count; }
+    });
+    var submissionsCutoff = Math.max(maxSubmissions / 100, 100);
+    var timeCutoff = new Date;
+    timeCutoff.setDate(timeCutoff.getDate() + 100); // Set time cutoff to 100 days in the future
+    var data = this.data.filter(function(entry) {
+      assert(entry.date.length === 8, "Invalid date string");
+      var YYYY = entry.date.substring(0, 4), MM = entry.date.substring(4, 6), DD = entry.date.substring(6, 8);
+      var date = new Date(YYYY + "-" + MM + "-" + DD);
+      return entry.count >= submissionsCutoff && date <= timeCutoff;
+    });
+    if (data.length === 0) { return null; }
+    return new Telemetry.Evolution(this.buckets, data, this.kind, this.description, this.measure);
+  }
   
   Evolution.prototype.dateRange = function(startDate, endDate) {
     assert(startDate.getTime, "`startDate` must be a date");
@@ -150,7 +168,7 @@ Telemetry.Evolution = (function() {
       var date = new Date(YYYY + "-" + MM + "-" + DD);
       return startDate <= date && date <= endDate;
     });
-    
+    if (data.length === 0) { return null; }
     return new Telemetry.Evolution(this.buckets, data, this.kind, this.description, this.measure);
   };
   

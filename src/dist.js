@@ -20,8 +20,9 @@ $(function() { Telemetry.init(function() {
   if (gInitialPageState.max_channel_version !== undefined) { $("#channel-version").multiselect("select", gInitialPageState.max_channel_version); }
   if (gInitialPageState.compare !== undefined) { $("#compare").multiselect("select", gInitialPageState.compare); }
   
-  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=cumulative-toggle][value=" + (gInitialPageState.cumulative !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   
   updateOptions(function() {
     $("#filter-product").multiselect("select", gInitialPageState.product);
@@ -47,7 +48,7 @@ $(function() { Telemetry.init(function() {
     $("#channel-version").change(function() {
       updateOptions(function() { $("#measure").trigger("change"); });
     });
-    $("input[name=build-time-toggle], #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type, #compare").change(function(e) {
+    $("input[name=build-time-toggle], input[name=sanitize-toggle], #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type, #compare").change(function(e) {
       var $this = $(this);
       if (gFilterChangeTimeout !== null) { clearTimeout(gFilterChangeTimeout); }
       gFilterChangeTimeout = setTimeout(function() { // Debounce the changes to prevent rapid filter changes from causing too many updates
@@ -78,7 +79,7 @@ $(function() { Telemetry.init(function() {
           gCurrentHistograms = histograms; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
           displayHistograms(histograms, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
-        });
+        }, $("input[name=sanitize-toggle]:checked").val() !== "0");
       }, 0);
     });
 
@@ -125,7 +126,7 @@ function updateOptions(callback) {
   });
 }
 
-function calculateHistograms(callback) {
+function calculateHistograms(callback, sanitize) {
   // Get selected version, measure, and aggregate options
   var channelVersion = $("#channel-version").val();
   var measure = $("#measure").val();
@@ -139,7 +140,7 @@ function calculateHistograms(callback) {
   var fullEvolutions = [], optionValues = [];
   var filterSetsCount = 0, totalFiltersCount = 0;
   var filterSetsMappingOptions = Object.keys(filterSetsMapping);
-  filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) {
+  filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) { // For each option being compared by
     var filterSets = filterSetsMapping[filterSetsMappingOption];
     var filtersCount = 0, fullEvolution = null;
     indicate("Updating histograms... 0%");
@@ -156,7 +157,7 @@ function calculateHistograms(callback) {
         if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
           filterSetsCount ++;
           if (fullEvolution !== null) {
-            fullEvolutions.push(fullEvolution);
+            fullEvolutions.push(sanitize ? fullEvolution.sanitized() : fullEvolution);
             optionValues.push(filterSetsMappingOption);
           }
           if (filterSetsCount === filterSetsMappingOptions.length) {
@@ -166,7 +167,7 @@ function calculateHistograms(callback) {
                 callback([], []);
               } else { // Filter the evolution to include only those histograms that are in the selected range
                 var filteredEvolutions = fullEvolutions.map(function(evolution) {
-                  return evolution.dateRange(dates[0], dates[dates.length - 1]);
+                  return evolution.dateRange(dates[0], dates[dates.length - 1]); // We don't need to worry about this returning null since the dates came from the evolution originally
                 });
                 var fullHistograms = filteredEvolutions.map(function(evolution, i) {
                   var histogram = evolution.histogram();
@@ -247,7 +248,7 @@ function updateDateRange(callback, evolutions, updatedByUser, shouldUpdateRangeb
     
     // If advanced settings are not at their defaults, expand the settings pane on load
     var fullDates = evolutions[0].dates();
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !startMoment.isSame(fullDates[0]) || !endMoment.isSame(fullDates[fullDates.length - 1])) {
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !startMoment.isSame(fullDates[0]) || !endMoment.isSame(fullDates[fullDates.length - 1])) {
       $("#advanced-settings-toggle").click();
     }
   }
@@ -489,6 +490,7 @@ function saveStateToUrlAndCookie() {
     compare: $("#compare").val(),
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
+    sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
     start_date: moment.utc(picker.startDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
     end_date: moment.utc(picker.endDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
     
@@ -557,7 +559,7 @@ function saveStateToUrlAndCookie() {
     var minMoment = start, maxMoment = end;
   }
   var start = moment.utc(gInitialPageState.start_date), end = moment.utc(gInitialPageState.end_date);
-  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !start.isSame(minMoment) || !end.isSame(maxMoment)) {
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !start.isSame(minMoment) || !end.isSame(maxMoment)) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
     $("#advanced-settings-toggle").find("span").text("");
