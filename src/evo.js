@@ -218,6 +218,11 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
       }
       if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
         indicate();
+        
+        if (sanitize && finalEvolution !== null) {
+          finalEvolution = finalEvolution.sanitized();
+        }
+        
         if (finalEvolution === null) { // No evolutions available
           callback([], [], measure);
           return;
@@ -229,14 +234,8 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
         });
         var submissionValues = finalEvolution.submissions();
         var dates = finalEvolution.dates();
-        
-        // Filter out those points corresponding to histograms where the number of submissions is too low
-        var submissionsCutoff = sanitize ? Math.max(Math.max.apply(Math, submissionValues) / 100, 100) : 0;
-        var timeCutoff = moment.utc().add(1, "years").toDate(); // Cut off all dates past one year in the future
         var finalAggregateValues = aggregateValues.map(function(values) { return []; }), finalSubmissionValues = [];
         dates.forEach(function(date, i) {
-          if (submissionValues[i] < submissionsCutoff) { return; }
-          if (date > timeCutoff) { return; }
           finalAggregateValues.forEach(function(values, j) { values.push({x: date.getTime(), y: aggregateValues[j][i]}); });
           finalSubmissionValues.push({x: date.getTime(), y: submissionValues[i]});
         });

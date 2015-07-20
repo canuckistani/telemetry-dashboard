@@ -20,8 +20,9 @@ $(function() { Telemetry.init(function() {
   if (gInitialPageState.max_channel_version !== undefined) { $("#channel-version").multiselect("select", gInitialPageState.max_channel_version); }
   if (gInitialPageState.compare !== undefined) { $("#compare").multiselect("select", gInitialPageState.compare); }
   
-  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=cumulative-toggle][value=" + (gInitialPageState.cumulative !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   
   updateOptions(function() {
     $("#filter-product").multiselect("select", gInitialPageState.product);
@@ -47,7 +48,7 @@ $(function() { Telemetry.init(function() {
     $("#channel-version").change(function() {
       updateOptions(function() { $("#measure").trigger("change"); });
     });
-    $("input[name=build-time-toggle], #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type, #compare").change(function(e) {
+    $("input[name=build-time-toggle], input[name=sanitize-toggle], #measure, #filter-product, #filter-os, #filter-arch, #filter-e10s, #filter-process-type, #compare").change(function(e) {
       var $this = $(this);
       if (gFilterChangeTimeout !== null) { clearTimeout(gFilterChangeTimeout); }
       gFilterChangeTimeout = setTimeout(function() { // Debounce the changes to prevent rapid filter changes from causing too many updates
@@ -79,7 +80,7 @@ $(function() { Telemetry.init(function() {
           gCurrentHistogramsList = histogramsList; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
           displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
-        });
+        }, $("input[name=sanitize-toggle]:checked").val() !== "0");
       }, 0);
     });
 
@@ -126,7 +127,7 @@ function updateOptions(callback) {
   });
 }
 
-function calculateHistograms(callback) {
+function calculateHistograms(callback, sanitize) {
   // Get selected version, measure, and aggregate options
   var channelVersion = $("#channel-version").val();
   var measure = $("#measure").val();
@@ -141,7 +142,7 @@ function calculateHistograms(callback) {
   var optionValues = []; // List of options in the order that they were done being processed, rather than the order they appeared in
   var filterSetsCount = 0, totalFiltersCount = 0;
   var filterSetsMappingOptions = Object.keys(filterSetsMapping);
-  filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) {
+  filterSetsMappingOptions.forEach(function(filterSetsMappingOption, i) { // For each option being compared by
     var filterSets = filterSetsMapping[filterSetsMappingOption];
     var filtersCount = 0, fullEvolutionMap = {};
     indicate("Updating histograms... 0%");
@@ -161,6 +162,7 @@ function calculateHistograms(callback) {
           optionValues.push(filterSetsMappingOption); // Add the current option value being compared by
           for (var label in fullEvolutionMap) { // Make a list of evolutions for each label in the evolution
             if (!fullEvolutionsMap.hasOwnProperty(label)) { fullEvolutionsMap[label] = []; }
+            if (sanitize) { fullEvolution = fullEvolution.sanitized(); }
             fullEvolutionsMap[label].push(fullEvolutionMap[label]);
           }
           if (filterSetsCount === filterSetsMappingOptions.length) { // Check if we have loaded all the filter set collections
@@ -177,7 +179,7 @@ function calculateHistograms(callback) {
                 var filteredEvolutionsMap = {}, filteredHistogramsMap = {};
                 for (var label in fullEvolutionsMap) {
                   filteredEvolutionsMap[label] = fullEvolutionsMap[label].map(function(evolution) {
-                    return evolution.dateRange(dates[0], dates[dates.length - 1]);
+                    return evolution.dateRange(dates[0], dates[dates.length - 1]); // We don't need to worry about this returning null since the dates came from the evolution originally
                   });
                   filteredHistogramsMap[label] = filteredEvolutionsMap[label].map(function(evolution, i) {
                     var histogram = evolution.histogram();
@@ -254,7 +256,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
     }
     
     // If advanced settings are not at their defaults, expand the settings pane on load
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !startMoment.isSame(minMoment) || !endMoment.isSame(maxMoment)) {
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !startMoment.isSame(minMoment) || !endMoment.isSame(maxMoment)) {
       $("#advanced-settings-toggle").click();
     }
   }
@@ -510,6 +512,7 @@ function saveStateToUrlAndCookie() {
     compare: $("#compare").val(),
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
+    sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
     start_date: moment.utc(picker.startDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
     end_date: moment.utc(picker.endDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
     
@@ -578,7 +581,7 @@ function saveStateToUrlAndCookie() {
     var minMoment = start, maxMoment = end;
   }
   var start = moment.utc(gInitialPageState.start_date), end = moment.utc(gInitialPageState.end_date);
-  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || !start.isSame(minMoment) || !end.isSame(maxMoment)) {
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !start.isSame(minMoment) || !end.isSame(maxMoment)) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
     $("#advanced-settings-toggle").find("span").text("");
