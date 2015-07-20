@@ -74,9 +74,17 @@ $(function() { Telemetry.init(function() {
           optionGroupLabel.addClass("all-selected");
         });
         
-        calculateHistograms(function(histograms, evolutions) {
-          $("#measure-description").text(evolutions.length === 0 ? $("#measure").val() : evolutions[0].description);
-          var histogramsList = [{title: "AAA", histograms: histograms}, {title: "BBB", histograms: histograms}];
+        calculateHistograms(function(histogramsMap, evolutionsMap) {
+          var description = $("#measure").val();
+          for (var label in evolutionsMap) {
+            description = evolutionsMap[label][0].description;
+            break;
+          }
+          $("#measure-description").text(description);
+          var histogramsList = [];
+          for (var label in histogramsMap) {
+            histogramsList.push({title: label, histograms: histogramsMap[label]});
+          }
           gCurrentHistogramsList = histogramsList; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
           displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
@@ -162,7 +170,7 @@ function calculateHistograms(callback, sanitize) {
           optionValues.push(filterSetsMappingOption); // Add the current option value being compared by
           for (var label in fullEvolutionMap) { // Make a list of evolutions for each label in the evolution
             if (!fullEvolutionsMap.hasOwnProperty(label)) { fullEvolutionsMap[label] = []; }
-            if (sanitize) { fullEvolution = fullEvolution.sanitized(); }
+            if (sanitize) { fullEvolutionMap[label] = fullEvolutionMap[label].sanitized(); }
             fullEvolutionsMap[label].push(fullEvolutionMap[label]);
           }
           if (filterSetsCount === filterSetsMappingOptions.length) { // Check if we have loaded all the filter set collections
@@ -174,7 +182,7 @@ function calculateHistograms(callback, sanitize) {
             }
             updateDateRange(function(dates) {
               if (dates == null) { // No dates in the selected range, so no histograms available
-                callback([], []);
+                callback({}, {});
               } else { // Filter the evolution to include only those histograms that are in the selected range
                 var filteredEvolutionsMap = {}, filteredHistogramsMap = {};
                 for (var label in fullEvolutionsMap) {
@@ -202,7 +210,7 @@ function calculateHistograms(callback, sanitize) {
   if (totalFilters === 0) { // No filters selected, so no histograms could be created
     indicate();
     updateDateRange(function(dates) {
-      callback([], []);
+      callback({}, {});
     }, [], false);
   }
 }
