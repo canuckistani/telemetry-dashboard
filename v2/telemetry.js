@@ -7,7 +7,7 @@ function assert(condition, message) {
 }
 
 var Telemetry = {
-  BASE_URL: 'http://ec2-52-12-57-130.us-west-2.compute.amazonaws.com:5000/',
+  BASE_URL: 'http://telemetry-aggregator-899171307.us-west-2.elb.amazonaws.com/',
   CHANNEL_VERSION_DATES: null,
   CHANNEL_VERSION_BUILDIDS: null,
   CACHE: {}, CACHE_LAST_UPDATED: {}, CACHE_TIMEOUT: 4 * 60 * 60 * 1000,
