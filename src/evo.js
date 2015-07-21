@@ -187,6 +187,7 @@ function calculateEvolutions(callback) {
       evolutionDescription = evolutionDescription || newDescription
       versionCount ++;
       if (versionCount === channelVersions.length) { // Check if lines were loaded for all the versions
+        indicate();
         callback(lines, submissionLines, evolutionDescription);
       }
     });
@@ -218,8 +219,6 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
         finalEvolution = finalEvolution.combine(evolution);
       }
       if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
-        indicate();
-        
         if (sanitize && finalEvolution !== null) {
           finalEvolution = finalEvolution.sanitized();
         }
@@ -252,7 +251,6 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
     });
   });
   if (filterSets.length === 0) {
-    indicate();
     callback([], [], measure);
   }
 }
