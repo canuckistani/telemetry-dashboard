@@ -131,6 +131,15 @@ function loadStateFromUrlAndCookie() {
   pageState.compare = typeof pageState.compare === "string" && ["", "os", "architecture", "e10sEnabled", "child"].indexOf(pageState.compare) >= 0 ?
     pageState.compare : "";
   
+  // versions are on two different channels, change the min version to be the smallest version in the max version's channel
+  if (pageState.min_channel_version.split("/")[0] !== pageState.max_channel_version.split("/")[0]) { // Two versions are on different channels, move the other one into the right channel
+    var channel = pageState.max_channel_version.split("/")[0];
+    var channelVersions = Telemetry.getVersions().filter(function(version) {
+      return version.startsWith(channel + "/") && version <= pageState.max_channel_version;
+    });
+    pageState.min_channel_version = channelVersions[Math.max(0, channelVersions.length - 4)];
+  }
+  
   pageState.use_submission_date = pageState.use_submission_date === "0" || pageState.use_submission_date === "1" ? parseInt(pageState.use_submission_date) : 0;
   pageState.sanitize = pageState.sanitize === "0" || pageState.sanitize === "1" ? parseInt(pageState.sanitize) : 1;
   pageState.cumulative = pageState.cumulative === "0" || pageState.cumulative === "1" ? parseInt(pageState.cumulative) : 0;
