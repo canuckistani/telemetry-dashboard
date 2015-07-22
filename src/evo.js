@@ -261,19 +261,16 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   lines = lines.filter(function(line) { return line.values.length > 0; });
   submissionLines = submissionLines.filter(function(line) { return line.values.length > 0; });
   
+  var timezoneOffsetMinutes = (new Date).getTimezoneOffset();
+  
   // Transform the data into a form that is suitable for plotting
-  var timezoneOffset = (new Date).getTimezoneOffset() * 60 * 1000; // Timezone offset in milliseconds
   var lineData = lines.map(function (line) {
-    var dataset = line.values.map(function(point) {
-      return {date: new Date(point.x + timezoneOffset), value: point.y};
-    });
+    var dataset = line.values.map(function(point) { return {date: moment(point.x).add(timezoneOffsetMinutes, "minutes").toDate(), value: point.y}; });
     dataset.push(dataset[dataset.length - 1]); // duplicate the last point to work around a metricsgraphics bug if there are multiple datasets where one or more datasets only have one point
     return dataset;
   });
   var submissionLineData = submissionLines.map(function (line) {
-    var dataset = line.values.map(function(point) {
-      return {date: new Date(point.x + timezoneOffset), value: point.y};
-    });
+    var dataset = line.values.map(function(point) { return {date: moment(point.x).add(timezoneOffsetMinutes, "minutes").toDate(), value: point.y}; });
     dataset.push(dataset[dataset.length - 1]); // duplicate the last point to work around a metricsgraphics bug if there are multiple datasets where one or more datasets only have one point
     return dataset;
   });
@@ -281,8 +278,8 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
   
   var aggregateMap = {};
   lines.forEach(function(line) { aggregateMap[line.aggregate] = true; });
-  var valueLabel = Object.keys(aggregateMap).sort().join(", ") + " " + (lines.length > 0 ? lines[0].measure : "");
   var variableLabel = useSubmissionDate ? "Submission Date (click to use Build ID)" : "Build ID (click to use Submission Date)";
+  var valueLabel = Object.keys(aggregateMap).sort().join(", ") + " " + (lines.length > 0 ? lines[0].measure : "");
   
   var markers = [], usedDates = {};
   lines.forEach(function(line) {
@@ -291,10 +288,10 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     if (usedDates[minDate].indexOf(line.getVersionString()) < 0) { usedDates[minDate].push(line.getVersionString()); }
   });
   for (var date in usedDates) {
-    markers.push({date: new Date(parseInt(date) + 1), label: usedDates[date]}); // Need to add 1ms because the leftmost marker won't show up otherwise
+    markers.push({date: moment(parseInt(date) + 1).add(timezoneOffsetMinutes, "minutes").toDate(), label: usedDates[date].join(", ")}); // Need to add 1ms because the leftmost marker won't show up otherwise
   }
-  if (markers.length > 0) {
-    markers[markers.length - 1].date = new Date(markers[markers.length - 1].date.getTime() - 2)
+  if (markers.length > 1) { // If there is a marker on the far right, move it back 2 milliseconds in order to make it visible again
+    markers[markers.length - 1].date = moment(markers[markers.length - 1].date.getTime() - 2).toDate();
   }
 
   // Plot the data using MetricsGraphics
@@ -315,7 +312,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     mouseover: function(d, i) {
       var date, rolloverCircle, lineList, values;
       if (d.values) {
-        date = d.values[0].date - timezoneOffset;
+        date = d.values[0].date - timezoneOffsetMinutes * 60 * 1000;
         rolloverCircle = $("#evolutions .mg-line-rollover-circle.mg-line" + d.values[0].line_id + "-color").get(0);
         var seen = {}; var entries = d.values.filter(function(entry) {
           if (seen[entry.line_id]) return false;
@@ -324,7 +321,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
         lineList = entries.map(function(entry) { return lines[entry.line_id - 1]; });
         values = entries.map(function(entry) { return entry.value; });
       } else {
-        date = d.date - timezoneOffset;
+        date = d.date - timezoneOffsetMinutes * 60 * 1000;
         rolloverCircle = $("#evolutions .mg-line-rollover-circle").get(0);
         lineList = [lines[d.line_id - 1]];
         values = [d.value];

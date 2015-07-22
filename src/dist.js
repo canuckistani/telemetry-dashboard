@@ -1,6 +1,7 @@
 var gInitialPageState = null;
 var gFilterChangeTimeout = null;
 var gCurrentHistogramsList = null; gCurrentDates = null;
+var gCurrentMinDate = null, gCurrentMaxDate = null;
 var gFilters = null, gPreviousFilterAllSelected = {};
 
 indicate("Initializing Telemetry...");
@@ -224,7 +225,6 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 
   gCurrentDateRangeUpdateCallback = callback || function() {};
   
-  var timezoneOffsetMinutes = (new Date).getTimezoneOffset();
   if (dates.length === 0) {
     $("#date-range").prop("disabled", true);
     $("#range-bar").hide();
@@ -236,7 +236,8 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
   
   var timeCutoff = moment.utc().add(1, "years").toDate().getTime();
   if (dates[dates.length - 1] > timeCutoff) { dates = dates.filter(function(date) { return date < timeCutoff }); }
-  var minMoment = moment.utc(dates[0]), maxMoment = moment.utc(dates[dates.length - 1]);
+  var minMoment = moment.utc(dates[0]).format("YYYY-MM-DD"), maxMoment = moment.utc(dates[dates.length - 1]).format("YYYY-MM-DD");
+  gCurrentMinDate = minMoment, gCurrentMaxDate = maxMoment;
 
   // Update the start and end range and update the selection if necessary
   var picker = $("#date-range").data("daterangepicker");
@@ -247,8 +248,8 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
     drops: "up", opens: "center",
     ranges: {
        "All": [minMoment, maxMoment],
-       "Last 30 Days": [maxMoment.clone().subtract(30, "days"), endMoment],
-       "Last 7 Days": [maxMoment.clone().subtract(6, "days"), endMoment],
+       "Last 30 Days": [moment.utc(maxMoment).subtract(30, "days").format("YYYY-MM-DD"), endMoment],
+       "Last 7 Days": [moment.utc(maxMoment).subtract(6, "days").format("YYYY-MM-DD"), endMoment],
     },
   }, function(chosenStartMoment, chosenEndMoment, label) {
     updateDateRange(gCurrentDateRangeUpdateCallback, evolutions, true);
@@ -257,34 +258,34 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
   // First load, update the date picker from the page state
   if (!gLoadedDateRangeFromState && gInitialPageState.start_date !== null && gInitialPageState.end_date !== null) {
     gLoadedDateRangeFromState = true;
-    var startMoment = moment.utc(gInitialPageState.start_date), endMoment = moment.utc(gInitialPageState.end_date);
-    if (startMoment.isValid() && endMoment.isValid()) {
-      picker.setStartDate(startMoment.clone().local()); picker.setEndDate(endMoment.clone().local());
+    var startMoment = gInitialPageState.start_date, endMoment = gInitialPageState.end_date;
+    if (moment.utc(startMoment).isValid() && moment.utc(endMoment).isValid()) {
+      picker.setStartDate(startMoment);
+      picker.setEndDate(endMoment);
       gPreviousMinMoment = minMoment; gPreviousMaxMoment = maxMoment;
     }
     
     // If advanced settings are not at their defaults, expand the settings pane on load
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !startMoment.isSame(minMoment) || !endMoment.isSame(maxMoment)) {
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 ||
+      startMoment !== minMoment || endMoment !== maxMoment) {
       $("#advanced-settings-toggle").click();
     }
   }
   
   // If the selected date range is now out of bounds, or the bounds were updated programmatically and changed, select the entire range
-  var pickerStartDate = moment.utc(picker.startDate).subtract(timezoneOffsetMinutes, "minutes");
-  var pickerEndDate = moment.utc(picker.endDate).subtract(timezoneOffsetMinutes, "minutes");
-  if (pickerStartDate.isAfter(maxMoment) || pickerEndDate.isBefore(minMoment) ||
-    (!updatedByUser && (!minMoment.isSame(gPreviousMinMoment) || !maxMoment.isSame(gPreviousMaxMoment)))) {
-    picker.setStartDate(minMoment.clone().local());
-    picker.setEndDate(maxMoment.clone().local());
-    pickerStartDate = minMoment;
-    pickerEndDate = maxMoment.clone().add(1, "days").subtract(1, "milliseconds");
+  var pickerStartDate = picker.startDate.format("YYYY-MM-DD");
+  var pickerEndDate = picker.endDate.format("YYYY-MM-DD");
+  if (pickerStartDate > maxMoment || pickerStartDate < minMoment || pickerEndDate > maxMoment || pickerEndDate < minMoment ||
+    (!updatedByUser && (minMoment !== gPreviousMinMoment || maxMoment !== gPreviousMaxMoment))) {
+    picker.setStartDate(minMoment); picker.setEndDate(maxMoment);
+    pickerStartDate = minMoment; pickerEndDate = maxMoment;
   }
   gPreviousMinMoment = minMoment; gPreviousMaxMoment = maxMoment;
   
   // Rebuild rangebar if it was changed by something other than the user
   if (shouldUpdateRangebar) {
     var rangeBarControl = RangeBar({
-      min: minMoment, max: maxMoment.clone().add(1, "days"),
+      min: minMoment, max: moment(maxMoment).add(1, "days").format("YYYY-MM-DD"),
       maxRanges: 1,
       valueFormat: function(ts) { return ts; },
       valueParse: function(date) { return moment.utc(date).valueOf(); },
@@ -297,22 +298,25 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
       var range = ranges[0];
       if (gLastTimeoutID !== null) { clearTimeout(gLastTimeoutID); }
       gLastTimeoutID = setTimeout(function() { // Debounce slider movement callback
-        picker.setStartDate(moment.utc(range[0]).local());
-        picker.setEndDate(moment.utc(range[1]).local().subtract(1, "days"));
+        picker.setStartDate(moment.utc(range[0]).format("YYYY-MM-DD"))
+        picker.setEndDate(moment.utc(range[1]).subtract(1, "days").format("YYYY-MM-DD"));
         updateDateRange(gCurrentDateRangeUpdateCallback, evolutions, true, false);
       }, 50);
     });
     $("#range-bar").empty().append(rangeBarControl.$el);
     var dateControls = $("#date-range-controls");
     $("#range-bar").outerWidth(dateControls.parent().width() - dateControls.outerWidth() - 10);
-    rangeBarControl.val([[pickerStartDate.toDate(), pickerEndDate.toDate()]]);
+    rangeBarControl.val([[moment(pickerStartDate).toDate(), moment(pickerEndDate).add(1, "days").toDate()]]);
   }
   
-  var min = pickerStartDate.toDate(), max = pickerEndDate.toDate();
-  var filteredDates = dates.filter(function(date) { return min <= date && date <= max; });
-  if (filteredDates.length == 0) {
-    $("#date-range").prop("disabled", false);
-    $("#range-bar").show();
+  var min = moment.utc(pickerStartDate).toDate(), max = moment.utc(pickerEndDate).toDate();
+  dates = dates.filter(function(date) { return min <= date && date <= max; });
+  
+  if (dates.length == 0) {
+    if (evolutions[0].dates().length === 0) {
+      $("#date-range").prop("disabled", true);
+      $("#range-bar").hide();
+    }
     gCurrentDateRangeUpdateCallback(null);
   } else {
     gCurrentDateRangeUpdateCallback(filteredDates);
@@ -512,7 +516,6 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
 var gPreviousCSVBlobUrl = null, gPreviousJSONBlobUrl = null;
 function saveStateToUrlAndCookie() {
   var picker = $("#date-range").data("daterangepicker");
-  var timezoneOffsetMinutes = (new Date).getTimezoneOffset();
   gInitialPageState = {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
@@ -521,14 +524,12 @@ function saveStateToUrlAndCookie() {
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
-    start_date: moment.utc(picker.startDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
-    end_date: moment.utc(picker.endDate).subtract(timezoneOffsetMinutes, "minutes").format("YYYY-MM-DD"),
+    start_date: moment(picker.startDate).format("YYYY-MM-DD"),
+    end_date: moment(picker.endDate).format("YYYY-MM-DD"),
     
     // Save a few unused properties that are used in the evolution dashboard, since state is shared between the two dashboards
     min_channel_version: gInitialPageState.min_channel_version !== undefined ?
       gInitialPageState.min_channel_version : "nightly/38",
-    sanitize: gInitialPageState.sanitize !== undefined ?
-      gInitialPageState.sanitize : 1,
   };
   
   // Only store these in the state if they are not all selected
@@ -583,13 +584,14 @@ function saveStateToUrlAndCookie() {
   }
   
   // If advanced settings are not at their defaults, display a notice in the panel header
-  if (gCurrentDates !== null) {
-    var minMoment = moment.utc(gCurrentDates[0]), maxMoment = moment.utc(gCurrentDates[gCurrentDates.length - 1]);
+  var start = gInitialPageState.start_date, end = gInitialPageState.end_date;
+  if (gCurrentMinDate !== null) {
+    var minMoment = gCurrentMinDate, maxMoment = gCurrentMaxDate;
   } else {
     var minMoment = start, maxMoment = end;
   }
-  var start = moment.utc(gInitialPageState.start_date), end = moment.utc(gInitialPageState.end_date);
-  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.sanitize !== 1 || !start.isSame(minMoment) || !end.isSame(maxMoment)) {
+  
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || start !== minMoment || end !== maxMoment) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
     $("#advanced-settings-toggle").find("span").text("");
