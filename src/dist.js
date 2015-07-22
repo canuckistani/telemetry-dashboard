@@ -156,7 +156,7 @@ function calculateHistograms(callback, sanitize) {
         }
         if (filtersCount === filterSets.length) { // Check if we have loaded all the needed filters
           filterSetsCount ++;
-          if (sanitize) { fullEvolution = fullEvolution.sanitized(); }
+          if (fullEvolution !== null && sanitize) { fullEvolution = fullEvolution.sanitized(); }
           if (fullEvolution !== null) {
             fullEvolutions.push(fullEvolution);
             optionValues.push(filterSetsMappingOption);
