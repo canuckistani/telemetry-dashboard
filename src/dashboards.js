@@ -135,7 +135,7 @@ function loadStateFromUrlAndCookie() {
   if (pageState.min_channel_version.split("/")[0] !== pageState.max_channel_version.split("/")[0]) { // Two versions are on different channels, move the other one into the right channel
     var channel = pageState.max_channel_version.split("/")[0];
     var channelVersions = Telemetry.getVersions().filter(function(version) {
-      return version.startsWith(channel + "/") && version <= toVersion;
+      return version.startsWith(channel + "/") && version <= pageState.max_channel_version;
     });
     pageState.min_channel_version = channelVersions[Math.max(0, channelVersions.length - 4)];
   }
