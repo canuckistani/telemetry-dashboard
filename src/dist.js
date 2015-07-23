@@ -81,14 +81,27 @@ $(function() { Telemetry.init(function() {
           var description = $("#measure").val();
           for (var label in evolutionsMap) {
             description = evolutionsMap[label][0].description;
-            gCurrentDates = evolutionsMap[label][0].dates();
             break;
           }
           $("#measure-description").text(description);
-          var histogramsList = [];
-          for (var label in histogramsMap) {
-            histogramsList.push({title: label, histograms: histogramsMap[label]});
+          
+          // Get the set union of all the dates in all the evolutions
+          var datesMap = {};
+          for (var label in evolutionsMap) {
+            evolutionsMap[label][0].dates().forEach(function(date) { datesMap[date.getTime()] = true; });
           }
+          gCurrentDates = Object.keys(datesMap).map(function(dateString) {
+            return new Date(parseInt(dateString));
+          }).sort(function(a, b) { return a - b; });
+
+          var histogramsList = Object.keys(histogramsMap).map(function(label) {
+            return {title: label, histograms: histogramsMap[label]};
+          }).sort(function(a, b) { // Sort alphabetically by label
+            return a.title < b.title ? -1 : a.title > b.title ? 1 : 0;
+          });
+          
+          multiselectSetOptions($("#selected-keys"), getHumanReadableOptions("", histogramsList.map(function(entry) { return entry.title; })));
+          
           gCurrentHistogramsList = histogramsList;
           displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
@@ -340,7 +353,6 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 function displayHistograms(histogramsList, dates, cumulative) {
   cumulative = cumulative || false;
   var axesList = [$("#distribution1").get(0), $("#distribution2").get(0), $("#distribution3").get(0), $("#distribution4").get(0)];
-  console.log(histogramsList)
   if (histogramsList.length === 1) { // Only one histograms set
     if (histogramsList[0].histograms.length === 1) { // Only one histogram in histograms set
       var histogram = histogramsList[0].histograms[0];

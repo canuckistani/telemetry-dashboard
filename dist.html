@@ -28,7 +28,7 @@
             </form>
             <h1>Histogram Dashboard V4 <span class="label label-warning" style="font-size: 12px">DRAFT</span></h1>
         </header>
-        <div class="row">
+        <div class="row" style="margin-bottom: 200px">
             <div class="col-md-12">
                 <h2 style="font-size: 18px; margin-bottom: 0">
                     <span style="font-weight: bold">
@@ -82,6 +82,7 @@
                             </div>
                         </div>
                     </div>
+                    <select id="selected-keys" class="multiselect" title="Selected keys" data-all-selected="All keys" data-n-selected="keys" multiple></select>
                     <div class="col-md-3" id="summary" style="padding-top: 7em">
                         <dl class="dl-horizontal" style="margin-top: 1em">
                             <dt title="The type of the histogram (e.g., linear, exponential, Boolean)">Histogram Type</dt><dd id="prop-kind"></dd>
@@ -112,7 +113,7 @@
                 </figure>
             </div>
         </div>
-        <div class="row">
+        <div class="row" style="position: fixed; bottom: 0px; width: 100%; z-index: 1">
             <div class="col-md-12">
                 <div class="panel panel-default">
                     <div class="panel-heading" role="tab">
