@@ -28,7 +28,7 @@
             </form>
             <h1>Histogram Dashboard V4 <span class="label label-warning" style="font-size: 12px">DRAFT</span></h1>
         </header>
-        <div class="row" style="margin-bottom: 200px">
+        <div class="row">
             <div class="col-md-12">
                 <h2 style="font-size: 18px; margin-bottom: 0">
                     <span style="font-weight: bold">
@@ -55,34 +55,32 @@
                 </h2>
                 <h3 id="measure-description" style="font-size: 14px; margin: 0 3px"></h3>
                 <figure class="col-md-12">
-                    <div class="col-md-9" style="z-index: 1">
-                        <div class="col-md-12">
-                            <div style="margin: 0 -150px 20px -30px">
-                                <div id="distribution"></div>
-                            </div>
-                        </div>
-                        <div class="col-md-6" style="display: none">
-                            <div style="margin: 0 -150px 20px -30px">
+                    <div class="col-md-9" id="plots">
+                        <div class="col-md-6" style="text-align: center">
+                            <h3><select id="selected-key1" class="multiselect" title="Selected keys"></select></h3>
+                            <div style="margin: -30px -250px 20px -130px; z-index: -1">
                                 <div id="distribution1"></div>
                             </div>
                         </div>
-                        <div class="col-md-6" style="display: none">
-                            <div style="margin: 0 -150px 20px -30px">
+                        <div class="col-md-6" style="text-align: center">
+                            <h3><select id="selected-key2" class="multiselect" title="Selected keys"></select></h3>
+                            <div style="margin: -30px -250px 20px -130px; z-index: -1">
                                 <div id="distribution2"></div>
                             </div>
                         </div>
-                        <div class="col-md-6" style="display: none">
-                            <div style="margin: 0 -150px 20px -30px">
+                        <div class="col-md-6" style="text-align: center">
+                            <h3><select id="selected-key3" class="multiselect" title="Selected keys"></select></h3>
+                            <div style="margin: -30px -250px 20px -130px; z-index: -1">
                                 <div id="distribution3"></div>
                             </div>
                         </div>
-                        <div class="col-md-6" style="display: none">
-                            <div style="margin: 0 -150px 20px -30px">
+                        <div class="col-md-6" style="text-align: center">
+                            <h3><select id="selected-key4" class="multiselect" title="Selected keys"></select></h3>
+                            <div style="margin: -50px -250px 20px -130px; z-index: -1">
                                 <div id="distribution4"></div>
                             </div>
                         </div>
                     </div>
-                    <select id="selected-keys" class="multiselect" title="Selected keys" data-all-selected="All keys" data-n-selected="keys" multiple></select>
                     <div class="col-md-3" id="summary" style="padding-top: 7em">
                         <dl class="dl-horizontal" style="margin-top: 1em">
                             <dt title="The type of the histogram (e.g., linear, exponential, Boolean)">Histogram Type</dt><dd id="prop-kind"></dd>
@@ -113,7 +111,7 @@
                 </figure>
             </div>
         </div>
-        <div class="row" style="position: fixed; bottom: 0px; width: 100%; z-index: 1">
+        <div class="row">
             <div class="col-md-12">
                 <div class="panel panel-default">
                     <div class="panel-heading" role="tab">

@@ -3,6 +3,7 @@ var gFilterChangeTimeout = null;
 var gCurrentHistogramsList = null; gCurrentDates = null;
 var gCurrentMinDate = null, gCurrentMaxDate = null;
 var gFilters = null, gPreviousFilterAllSelected = {};
+var gAxesList = null;
 
 indicate("Initializing Telemetry...");
 
@@ -14,6 +15,10 @@ $(function() { Telemetry.init(function() {
     "e10sEnabled":  $("#filter-e10s"),
     "child"      :  $("#filter-process-type"),
   };
+  gAxesList = [
+    $("#distribution1").get(0), $("#distribution2").get(0),
+    $("#distribution3").get(0), $("#distribution4").get(0),
+  ];
   gInitialPageState = loadStateFromUrlAndCookie();
   
   // Set up settings selectors
@@ -78,6 +83,7 @@ $(function() { Telemetry.init(function() {
         calculateHistograms(function(histogramsMap, evolutionsMap) {
           // histogramsMap is a mapping from keyed histogram keys (or "" if not a keyed histogram) to lists of histograms (one per comparison option, so each histogram in a list has the same buckets)
           // evolutionsMap is a mapping from keyed histogram keys (or "" if not a keyed histogram) to lists of evolutions (one per comparison option, so each evolution in a list has the same dates)
+          
           var description = $("#measure").val();
           for (var label in evolutionsMap) {
             description = evolutionsMap[label][0].description;
@@ -99,14 +105,31 @@ $(function() { Telemetry.init(function() {
           }).sort(function(a, b) { // Sort alphabetically by label
             return a.title < b.title ? -1 : a.title > b.title ? 1 : 0;
           });
-          
-          multiselectSetOptions($("#selected-keys"), getHumanReadableOptions("", histogramsList.map(function(entry) { return entry.title; })));
-          
           gCurrentHistogramsList = histogramsList;
-          displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
-          saveStateToUrlAndCookie();
+          
+          multiselectSetOptions($("#selected-key1"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          multiselectSetOptions($("#selected-key2"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          multiselectSetOptions($("#selected-key3"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          multiselectSetOptions($("#selected-key4"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          $("#selected-key1").trigger("change");
         }, $("input[name=sanitize-toggle]:checked").val() !== "0");
       }, 0);
+    });
+    
+    $("#selected-key1, #selected-key2, #selected-key3, #selected-key4").change(function(e) {
+      if (gCurrentHistogramsList.length > 1) { // Keyed histogram with multiple keys
+        var histogramsList = [];
+        var keys = $("#selected-key1, #selected-key2, #selected-key3, #selected-key4").each(function(i, selector) {
+          var key = $(selector).val();
+          gCurrentHistogramsList.forEach(function(entry) {
+            if (entry.title === key) { histogramsList.push(entry); }
+          });
+        });
+      } else { // Non-keyed histogram or a keyed histogram with only one key
+        var histogramsList = gCurrentHistogramsList;
+      }
+      displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
+      saveStateToUrlAndCookie();
     });
 
     // Perform a full display refresh
@@ -352,7 +375,6 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 
 function displayHistograms(histogramsList, dates, cumulative) {
   cumulative = cumulative || false;
-  var axesList = [$("#distribution1").get(0), $("#distribution2").get(0), $("#distribution3").get(0), $("#distribution4").get(0)];
   if (histogramsList.length === 1) { // Only one histograms set
     if (histogramsList[0].histograms.length === 1) { // Only one histogram in histograms set
       var histogram = histogramsList[0].histograms[0];
@@ -372,21 +394,25 @@ function displayHistograms(histogramsList, dates, cumulative) {
       } else {
         $(".scalar-only").hide();
       }
-      $("#summary").show();
+      $("#summary").show(); $("#plots").removeClass("col-md-11").addClass("col-md-9");
+      
     } else {
-      $("#summary").hide();
+      $("#summary").hide(); $("#plots").removeClass("col-md-9").addClass("col-md-11");
     }
     
-    $("#distribution").parent().parent().show();
-    axesList.forEach(function(axes, i) { $(axes).parent().parent().hide(); });
-    displaySingleHistogramSet($("#distribution").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
+    gAxesList.forEach(function(axes) { $(axes).hide(); });
+    $(gAxesList[0]).show();
+    var axesContainer = $(gAxesList[0]).parent().parent();
+    axesContainer.removeClass("col-md-6").addClass("col-md-10").show();
+    axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
+    displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
   }
   else { // Multiple histograms, each one keyed
-    $("#summary").hide();
-    
-    $("#distribution").parent().parent().hide();
-    axesList.forEach(function(axes, i) {
-      $(axes).parent().parent().show();
+    $("#summary").hide(); $("#plots").removeClass("col-md-9").addClass("col-md-11");
+    gAxesList.forEach(function(axes, i) {
+      var axesContainer = $(axes).parent().parent().show();
+      axesContainer.removeClass("col-md-12").addClass("col-md-6").show();
+      axesContainer.find("h3").show(); // Show the graph title to allow key selection
       var entry = histogramsList[i] || null;
       if (entry !== null) {
         displaySingleHistogramSet(axes, entry.histograms, entry.title, cumulative);
@@ -435,7 +461,7 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
       binned: true,
       chart_type: "histogram",
       full_width: true, height: $(axes).width() * 0.4,
-      left: 150, right: $(axes).width() / (distributionSamples[0].length + 1) + 150,
+      left: 250, right: $(axes).width() / (distributionSamples[0].length + 1) + 250,
       transition_on_update: false,
       target: axes,
       x_label: histogram.description, y_label: "Percentage of Samples",
@@ -485,7 +511,7 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
       data: distributionSamples,
       chart_type: "line",
       full_width: true, height: $(axes).width() * 0.4,
-      left: 150, right: 150,
+      left: 250, right: 250,
       transition_on_update: false,
       target: axes,
       x_label: histograms[0].description, y_label: "Percentage of Samples",
@@ -535,7 +561,7 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
   $(axes).find(".mg-x-axis line").each(function(i, tick) { // Extend axis ticks to 15 pixels
     $(tick).attr("y2", parseInt($(tick).attr("y1")) + 12);
   });
-  $(axes).find(".mg-y-axis .label").attr("y", "90").attr("dy", "0");
+  $(axes).find(".mg-y-axis .label").attr("y", "190").attr("dy", "0");
 }
 
 // Save the current state to the URL and the page cookie
@@ -585,7 +611,6 @@ function saveStateToUrlAndCookie() {
     $(".permalink-control input").hide(); // Hide the permalink box again since the URL changed
   }
 
-  
   // Save the state in a cookie that expires in 3 days
   var expiry = new Date();
   expiry.setTime(expiry.getTime() + (3 * 24 * 60 * 60 * 1000));
