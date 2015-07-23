@@ -76,9 +76,12 @@ $(function() { Telemetry.init(function() {
         });
         
         calculateHistograms(function(histogramsMap, evolutionsMap) {
+          // histogramsMap is a mapping from keyed histogram keys (or "" if not a keyed histogram) to lists of histograms (one per comparison option, so each histogram in a list has the same buckets)
+          // evolutionsMap is a mapping from keyed histogram keys (or "" if not a keyed histogram) to lists of evolutions (one per comparison option, so each evolution in a list has the same dates)
           var description = $("#measure").val();
           for (var label in evolutionsMap) {
             description = evolutionsMap[label][0].description;
+            gCurrentDates = evolutionsMap[label][0].dates();
             break;
           }
           $("#measure-description").text(description);
@@ -86,7 +89,7 @@ $(function() { Telemetry.init(function() {
           for (var label in histogramsMap) {
             histogramsList.push({title: label, histograms: histogramsMap[label]});
           }
-          gCurrentHistogramsList = histogramsList; gCurrentDates = evolutions.length === 0 ? null : evolutions[0].dates();
+          gCurrentHistogramsList = histogramsList;
           displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
           saveStateToUrlAndCookie();
         }, $("input[name=sanitize-toggle]:checked").val() !== "0");
@@ -170,34 +173,45 @@ function calculateHistograms(callback, sanitize) {
           filterSetsCount ++;
           optionValues.push(filterSetsMappingOption); // Add the current option value being compared by
           for (var label in fullEvolutionMap) { // Make a list of evolutions for each label in the evolution
-            if (!fullEvolutionsMap.hasOwnProperty(label)) { fullEvolutionsMap[label] = []; }
             if (sanitize) { fullEvolutionMap[label] = fullEvolutionMap[label].sanitized(); }
-            fullEvolutionsMap[label].push(fullEvolutionMap[label]);
+            if (fullEvolutionMap[label] !== null) {
+              if (!fullEvolutionsMap.hasOwnProperty(label)) { fullEvolutionsMap[label] = []; }
+              fullEvolutionsMap[label].push(fullEvolutionMap[label]);
+            }
           }
           if (filterSetsCount === filterSetsMappingOptions.length) { // Check if we have loaded all the filter set collections
             indicate();
-            var dates = null;
+            
+            // Get the set union of all the dates in all the evolutions
+            var datesMap = {};
             for (var label in fullEvolutionsMap) {
-              dates = fullEvolutionsMap[label][0].dates();
-              break;
+              fullEvolutionsMap[label][0].dates().forEach(function(date) { datesMap[date.getTime()] = true; });
             }
+            var dates = Object.keys(datesMap).map(function(dateString) {
+              return new Date(parseInt(dateString));
+            }).sort(function(a, b) { return a - b; });
+
             updateDateRange(function(dates) {
               if (dates == null) { // No dates in the selected range, so no histograms available
                 callback({}, {});
               } else { // Filter the evolution to include only those histograms that are in the selected range
                 var filteredEvolutionsMap = {}, filteredHistogramsMap = {};
                 for (var label in fullEvolutionsMap) {
-                  filteredEvolutionsMap[label] = fullEvolutionsMap[label].map(function(evolution) {
+                  var filteredEvolutions = fullEvolutionsMap[label].map(function(evolution) {
                     return evolution.dateRange(dates[0], dates[dates.length - 1]); // We don't need to worry about this returning null since the dates came from the evolution originally
-                  });
-                  filteredHistogramsMap[label] = filteredEvolutionsMap[label].map(function(evolution, i) {
-                    var histogram = evolution.histogram();
-                    if (comparisonName !== "") { // We are comparing by an option value
-                      var humanReadableOption = getHumanReadableOptions(comparisonName, [optionValues[i]])[0][1];
-                      histogram.measure = humanReadableOption;
-                    }
-                    return histogram;
-                  });
+                  }).filter(function(evolution) { return evolution !== null; });
+                  if (filteredEvolutions.length > 0) { // There are evolutions in this date
+                    filteredEvolutionsMap[label] = filteredEvolutions;
+                    filteredHistogramsMap[label] = filteredEvolutions.map(function(evolution, i) {
+                      var histogram = evolution.histogram();
+                      histogram.description = label;
+                      if (comparisonName !== "") { // We are comparing by an option value
+                        var humanReadableOption = getHumanReadableOptions(comparisonName, [optionValues[i]])[0][1];
+                        histogram.measure = humanReadableOption;
+                      }
+                      return histogram;
+                    });
+                  }
                 }
                 callback(filteredHistogramsMap, filteredEvolutionsMap);
               }
@@ -252,7 +266,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
        "Last 7 Days": [moment.utc(maxMoment).subtract(6, "days").format("YYYY-MM-DD"), endMoment],
     },
   }, function(chosenStartMoment, chosenEndMoment, label) {
-    updateDateRange(gCurrentDateRangeUpdateCallback, evolutions, true);
+    updateDateRange(gCurrentDateRangeUpdateCallback, dates, true);
   });
   
   // First load, update the date picker from the page state
@@ -300,7 +314,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
       gLastTimeoutID = setTimeout(function() { // Debounce slider movement callback
         picker.setStartDate(moment.utc(range[0]).format("YYYY-MM-DD"))
         picker.setEndDate(moment.utc(range[1]).subtract(1, "days").format("YYYY-MM-DD"));
-        updateDateRange(gCurrentDateRangeUpdateCallback, evolutions, true, false);
+        updateDateRange(gCurrentDateRangeUpdateCallback, dates, true, false);
       }, 50);
     });
     $("#range-bar").empty().append(rangeBarControl.$el);
@@ -310,10 +324,10 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
   }
   
   var min = moment.utc(pickerStartDate).toDate(), max = moment.utc(pickerEndDate).toDate();
-  dates = dates.filter(function(date) { return min <= date && date <= max; });
+  var filteredDates = dates.filter(function(date) { return min <= date && date <= max; });
   
-  if (dates.length == 0) {
-    if (evolutions[0].dates().length === 0) {
+  if (filteredDates.length == 0) {
+    if (dates.length === 0) {
       $("#date-range").prop("disabled", true);
       $("#range-bar").hide();
     }
@@ -326,7 +340,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 function displayHistograms(histogramsList, dates, cumulative) {
   cumulative = cumulative || false;
   var axesList = [$("#distribution1").get(0), $("#distribution2").get(0), $("#distribution3").get(0), $("#distribution4").get(0)];
-  
+  console.log(histogramsList)
   if (histogramsList.length === 1) { // Only one histograms set
     if (histogramsList[0].histograms.length === 1) { // Only one histogram in histograms set
       var histogram = histogramsList[0].histograms[0];
@@ -458,7 +472,7 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
     MG.data_graphic({
       data: distributionSamples,
       chart_type: "line",
-      full_width: true, height: 600,
+      full_width: true, height: $(axes).width() * 0.4,
       left: 150, right: 150,
       transition_on_update: false,
       target: axes,
