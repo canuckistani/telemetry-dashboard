@@ -111,6 +111,12 @@ $(function() { Telemetry.init(function() {
           multiselectSetOptions($("#selected-key2"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
           multiselectSetOptions($("#selected-key3"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
           multiselectSetOptions($("#selected-key4"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          var keys = gInitialPageState.keys;
+          if (keys[0] !== undefined) { $("#selected-key1").multiselect("select", keys[0]); }
+          if (keys[1] !== undefined) { $("#selected-key2").multiselect("select", keys[1]); }
+          if (keys[2] !== undefined) { $("#selected-key3").multiselect("select", keys[2]); }
+          if (keys[3] !== undefined) { $("#selected-key4").multiselect("select", keys[3]); }
+          
           $("#selected-key1").trigger("change");
         }, $("input[name=sanitize-toggle]:checked").val() !== "0");
       }, 0);
@@ -572,7 +578,6 @@ function saveStateToUrlAndCookie() {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
     product: $("#filter-product").val() || [],
-    compare: $("#compare").val(),
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
@@ -584,6 +589,11 @@ function saveStateToUrlAndCookie() {
       gInitialPageState.min_channel_version : "nightly/38",
   };
   
+  var selected = $("#compare").val();
+  if (selected !== "") { gInitialPageState.compare = selected; }
+  var selected = [$("#selected-key1").val(), $("#selected-key2").val(), $("#selected-key3").val(), $("#selected-key4").val()].filter(function(value) { return value !== ""; });
+  if (selected.length > 0) { gInitialPageState.keys = selected; }
+
   // Only store these in the state if they are not all selected
   var selected = $("#filter-os").val() || [];
   if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = compressOSs(); }

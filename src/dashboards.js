@@ -165,6 +165,8 @@ function loadStateFromUrlAndCookie() {
   pageState.compare = typeof pageState.compare === "string" && ["", "os", "architecture", "e10sEnabled", "child"].indexOf(pageState.compare) >= 0 ?
     pageState.compare : "";
   
+  pageState.keys = typeof pageState.keys === "string" ? pageState.keys.split("!") : [];
+  
   // versions are on two different channels, change the min version to be the smallest version in the max version's channel
   if (pageState.min_channel_version.split("/")[0] !== pageState.max_channel_version.split("/")[0]) { // Two versions are on different channels, move the other one into the right channel
     var channel = pageState.max_channel_version.split("/")[0];
