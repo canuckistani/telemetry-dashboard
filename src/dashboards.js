@@ -104,8 +104,10 @@ $(document).ready(function() {
 
 // Load the current state from the URL, or the cookie if the URL is not specified
 function loadStateFromUrlAndCookie() {
-  var url = window.location.hash;
-  url = url[0] === "#" ? url.slice(1) : url;
+  var url = "";
+  var index = location.href.indexOf("#");
+  if (index > -1) { url = location.href.substring(index + 1); }
+  url = decodeURI(url);
   var pageState = {};
   
   // Load from cookie if URL does not have state
@@ -526,7 +528,8 @@ function multiselectSetOptions(element, options, defaultSelected) {
     }).join()).multiselect("rebuild");
   }
 
-  element.multiselect("deselectAll", false).multiselect("select", selected); // Select the original options where applicable
+  element.multiselect("deselectAll", false).next().find("input[type=radio]").attr("checked", false); // Workaround for bug where the first radio button is always checked
+  element.multiselect("select", selected); // Select the original options where applicable
   
   if (useGroups) { // Make the group labels sticky to the top and bottom of the selector
     var selector = element.next().find(".multiselect-container");
