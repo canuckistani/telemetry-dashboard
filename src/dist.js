@@ -388,8 +388,8 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 
 function displayHistograms(histogramsList, dates, cumulative) {
   cumulative = cumulative || false;
-  if (histogramsList.length === 1) { // Only one histograms set
-    if (histogramsList[0].histograms.length === 1) { // Only one histogram in histograms set
+  if (histogramsList.length <= 1) { // Only one histograms set
+    if (histogramsList.length === 1 && histogramsList[0].histograms.length === 1) { // Only show one set of axes
       var histogram = histogramsList[0].histograms[0];
       $("#prop-kind").text(histogram.kind);
       $("#prop-dates").text(formatNumber(dates.length));
@@ -407,20 +407,26 @@ function displayHistograms(histogramsList, dates, cumulative) {
       } else {
         $(".scalar-only").hide();
       }
-      $("#summary").show(); $("#plots").removeClass("col-md-11").addClass("col-md-9");
+      $("#summary").show();
       
     } else {
-      $("#summary").hide(); $("#plots").removeClass("col-md-9").addClass("col-md-11");
+      $("#summary").hide();
     }
     
-    gAxesList.forEach(function(axes) { $(axes).hide(); });
+    $("#plots").removeClass("col-md-11").addClass("col-md-9");
+    gAxesList.forEach(function(axes) { $(axes).parent().parent().hide(); });
     $(gAxesList[0]).show();
     var axesContainer = $(gAxesList[0]).parent().parent();
     axesContainer.removeClass("col-md-6").addClass("col-md-12").show();
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
-    displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
+    
+    if (histogramsList.length > 0) {
+      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
+    } else {
+      displaySingleHistogramSet($("#distribution1").get(0), [], 1, "", cumulative);
+    }
   }
-  else { // Multiple histograms, each one keyed
+  else { // Show all four axes
     $("#summary").hide(); $("#plots").removeClass("col-md-9").addClass("col-md-11");
     gAxesList.forEach(function(axes, i) {
       var axesContainer = $(axes).parent().parent().show();
