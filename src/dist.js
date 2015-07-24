@@ -421,9 +421,9 @@ function displayHistograms(histogramsList, dates, cumulative) {
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
     
     if (histogramsList.length > 0) {
-      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
+      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, histogramsList[0].title, cumulative);
     } else {
-      displaySingleHistogramSet($("#distribution1").get(0), [], 1, "", cumulative);
+      displaySingleHistogramSet($("#distribution1").get(0), [], "", cumulative);
     }
   }
   else { // Show all four axes
