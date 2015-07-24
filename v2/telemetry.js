@@ -188,7 +188,12 @@ Telemetry.Evolution = (function() {
     return this.data.sort(function(a, b) { return parseInt(a.date) - parseInt(b.date); })
       .map(function(entry, i) {
       var histogram = new Telemetry.Histogram(evolution.buckets, entry.histogram, evolution.kind, entry.count, entry.sum, evolution.description, evolution.measure);
-      return callback.call(evolution, histogram, i);
+      
+      assert(entry.date.length === 8, "Invalid date string");
+      var YYYY = entry.date.substring(0, 4), MM = entry.date.substring(4, 6), DD = entry.date.substring(6, 8);
+      var date = new Date(YYYY + "-" + MM + "-" + DD);
+      
+      return callback.call(evolution, histogram, i, date);
     });
   };
   
@@ -225,7 +230,7 @@ Telemetry.getJSON = function(url, callback) {
       };
       return;
     } else if ((new Date).getTime() - Telemetry.CACHE_LAST_UPDATED[url] < Telemetry.CACHE_TIMEOUT) { // In cache and hasn't expired
-      setTimeout(function() { callback(Telemetry.CACHE[url], Telemetry.CACHE[url] === null ? 404 : 200); }, 1);
+      setTimeout(function() { callback(Telemetry.CACHE[url], Telemetry.CACHE[url] === null ? 404 : null); }, 1);
       return;
     }
   }
@@ -303,7 +308,7 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
     "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(buildDates) +
     "&metric=" + encodeURIComponent(metric) + filterString, function(histograms, status) {
     if (histograms === null) {
-      assert(status === 404, "Could not obtain evolution"); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
+      assert(status === 404, "Could not obtain evolution: status " + status); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
       callback({});
     } else {
       var entriesMap = {}; // Mapping from entry labels to a list of entries having that label
@@ -326,7 +331,7 @@ Telemetry.getFilterOptions = function Telemetry_getOptions(channel, version, cal
   assert(typeof callback === "function", "`callback` must be a function");
   Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel + "/filters/", function(filterOptions) {
     filterOptions["metric"] = filterOptions["metric"].filter(function(measure) {
-      return !measure.startsWith("STARTUP_"); // Ignore STARTUP_* histograms since nobody ever uses them
+      return !/^STARTUP_/.test(measure); // Ignore STARTUP_* histograms since nobody ever uses them
     });
     callback(filterOptions);
   });
@@ -343,16 +348,6 @@ Telemetry.getVersions = function Telemetry_getVersions(fromVersion, toVersion) {
   }
   versions.sort();
   return fromVersion !== undefined ? versions.filter(function(version) { return fromVersion <= version && version <= toVersion }) : versions;
-}
-
-Telemetry.getMeasures = function Telemetry_getMeasures(channel, version, callback) {
-  assert(typeof channel === "string", "`channel` must be a string");
-  assert(typeof version === "string", "`version` must be a string");
-  assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/build_id/channels/" + channel +
-    "/filters/metric", function(measures) {
-    callback(measures);
-  });
 }
 
 exports.Telemetry = Telemetry;

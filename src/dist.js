@@ -2,8 +2,9 @@ var gInitialPageState = null;
 var gFilterChangeTimeout = null;
 var gCurrentHistogramsList = null; gCurrentDates = null;
 var gCurrentMinDate = null, gCurrentMaxDate = null;
-var gFilters = null, gPreviousFilterAllSelected = {};
-var gAxesList = null;
+var gFilters, gPreviousFilterAllSelected = {};
+var gAxesList;
+var gAxesSelectors;
 
 indicate("Initializing Telemetry...");
 
@@ -19,6 +20,12 @@ $(function() { Telemetry.init(function() {
     $("#distribution1").get(0), $("#distribution2").get(0),
     $("#distribution3").get(0), $("#distribution4").get(0),
   ];
+  gAxesSelectors = [
+    $("#selected-key1"),
+    $("#selected-key2"),
+    $("#selected-key3"),
+    $("#selected-key4"),
+  ]
   gInitialPageState = loadStateFromUrlAndCookie();
   
   // Set up settings selectors
@@ -107,15 +114,15 @@ $(function() { Telemetry.init(function() {
           });
           gCurrentHistogramsList = histogramsList;
           
-          multiselectSetOptions($("#selected-key1"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
-          multiselectSetOptions($("#selected-key2"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
-          multiselectSetOptions($("#selected-key3"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
-          multiselectSetOptions($("#selected-key4"), getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
-          var keys = gInitialPageState.keys;
-          if (keys[0] !== undefined) { $("#selected-key1").multiselect("select", keys[0]); }
-          if (keys[1] !== undefined) { $("#selected-key2").multiselect("select", keys[1]); }
-          if (keys[2] !== undefined) { $("#selected-key3").multiselect("select", keys[2]); }
-          if (keys[3] !== undefined) { $("#selected-key4").multiselect("select", keys[3]); }
+          // Set up key selectors
+          gAxesSelectors.forEach(function(selector) {
+            multiselectSetOptions(selector, getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          });
+          if (gInitialPageState.keys) { // Selected key
+            gInitialPageState.keys.forEach(function(key, i) {
+              if (key !== undefined) { gAxesSelectors[i].multiselect("select", key); }
+            })
+          }
           
           $("#selected-key1").trigger("change");
         }, $("input[name=sanitize-toggle]:checked").val() !== "0");
@@ -409,7 +416,7 @@ function displayHistograms(histogramsList, dates, cumulative) {
     gAxesList.forEach(function(axes) { $(axes).hide(); });
     $(gAxesList[0]).show();
     var axesContainer = $(gAxesList[0]).parent().parent();
-    axesContainer.removeClass("col-md-6").addClass("col-md-10").show();
+    axesContainer.removeClass("col-md-6").addClass("col-md-12").show();
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
     displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, 1, histogramsList[0].title, cumulative);
   }
