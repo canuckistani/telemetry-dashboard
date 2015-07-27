@@ -345,7 +345,7 @@ function getHumanReadableOptions(filterName, options) {
     });
   } else if (filterName === "measure") {
     // Add a hidden version of the option with spaces instead of underscores, to be able to search with spaces
-    return options.map(function(option) { return [option, option] });
+    return options.sort().map(function(option) { return [option, option] });
   } else if (filterName === "channelVersion") {
     // Find the latest nightly version
     var latestNightlyVersion = 0;
