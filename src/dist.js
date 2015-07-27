@@ -326,7 +326,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
     }
     
     // If advanced settings are not at their defaults, expand the settings pane on load
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 ||
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 ||
       startMoment !== minMoment || endMoment !== maxMoment) {
       $("#advanced-settings-toggle").click();
     }
@@ -682,7 +682,7 @@ function saveStateToUrlAndCookie() {
     var minMoment = start, maxMoment = end;
   }
   
-  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || start !== minMoment || end !== maxMoment) {
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 || start !== minMoment || end !== maxMoment) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
     $("#advanced-settings-toggle").find("span").text("");

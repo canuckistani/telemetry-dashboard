@@ -179,6 +179,7 @@ function loadStateFromUrlAndCookie() {
   pageState.use_submission_date = pageState.use_submission_date === "0" || pageState.use_submission_date === "1" ? parseInt(pageState.use_submission_date) : 0;
   pageState.sanitize = pageState.sanitize === "0" || pageState.sanitize === "1" ? parseInt(pageState.sanitize) : 1;
   pageState.cumulative = pageState.cumulative === "0" || pageState.cumulative === "1" ? parseInt(pageState.cumulative) : 0;
+  pageState.trim = pageState.trim === "0" || pageState.trim === "1" ? parseInt(pageState.trim) : 1;
   pageState.start_date = typeof pageState.start_date === "string" && /\d{4}-\d{2}-\d{2}/.test(pageState.start_date) ? pageState.start_date : null;
   pageState.end_date = typeof pageState.end_date === "string" && /\d{4}-\d{2}-\d{2}/.test(pageState.end_date) ? pageState.end_date : null;
   return pageState;
