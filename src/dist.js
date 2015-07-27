@@ -171,17 +171,17 @@ function updateOptions(callback) {
   var parts = channelVersion.split("/"); //wip: clean this up
   indicate("Updating options...");
   Telemetry.getFilterOptions(parts[0], parts[1], function(optionsMap) {
-    multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric)));
+    multiselectSetOptions($("#measure"), getHumanReadableOptions("measure", deduplicate(optionsMap.metric || [])));
     $("#measure").multiselect("select", gInitialPageState.measure);
 
-    multiselectSetOptions($("#filter-product"), getHumanReadableOptions("application", deduplicate(optionsMap.application)));
-    multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("architecture", deduplicate(optionsMap.architecture)));
-    multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10sEnabled", deduplicate(optionsMap.e10sEnabled)));
-    multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("child", deduplicate(optionsMap.child)));
+    multiselectSetOptions($("#filter-product"), getHumanReadableOptions("application", deduplicate(optionsMap.application || [])));
+    multiselectSetOptions($("#filter-arch"), getHumanReadableOptions("architecture", deduplicate(optionsMap.architecture || [])));
+    multiselectSetOptions($("#filter-e10s"), getHumanReadableOptions("e10sEnabled", deduplicate(optionsMap.e10sEnabled || [])));
+    multiselectSetOptions($("#filter-process-type"), getHumanReadableOptions("child", deduplicate(optionsMap.child || [])));
 
     // Compressing and expanding the OSs also has the effect of making OSs where all the versions were selected also all selected in the new one, regardless of whether those versions were actually in common or not
     var selectedOSs = compressOSs();
-    multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os)));
+    multiselectSetOptions($("#filter-os"), getHumanReadableOptions("os", deduplicate(optionsMap.os || [])));
     $("#filter-os").multiselect("select", expandOSs(selectedOSs));
 
     if (callback !== undefined) { indicate(); callback(); }
@@ -197,6 +197,14 @@ function calculateHistograms(callback, sanitize) {
   var filterSetsMapping = getFilterSetsMapping(gFilters, comparisonName !== "" ? comparisonName : null); // Mapping from option values to lists of filter sets
   var totalFilters = 0;
   for (var option in filterSetsMapping) { totalFilters += filterSetsMapping[option].length; }
+
+  if (totalFilters === 0 || measure === null) { // No filters selected, or no measures available, so no histograms could be created
+    indicate();
+    updateDateRange(function(dates) {
+      callback({}, {});
+    }, [], false);
+    return;
+  }
   
   var useSubmissionDate = $("input[name=build-time-toggle]:checked").val() !== "0";
   var fullEvolutionsMap = {}; // Mapping from labels (the keys in keyed histograms) to lists of combined filtered evolutions (one per comparison option, combined from all filter sets in that option)
@@ -270,13 +278,6 @@ function calculateHistograms(callback, sanitize) {
       });
     });
   });
-  
-  if (totalFilters === 0) { // No filters selected, so no histograms could be created
-    indicate();
-    updateDateRange(function(dates) {
-      callback({}, {});
-    }, [], false);
-  }
 }
 
 var gLastTimeoutID = null;
