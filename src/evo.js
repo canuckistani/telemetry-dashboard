@@ -370,7 +370,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
     mouseover: function(d, i) {
       var date, rolloverCircle, lineList, values;
       if (d.values) {
-        date = d.values[0].date - timezoneOffset;
+        date = d.values[0].date - timezoneOffsetMinutes * 60 * 1000;
         rolloverCircle = $("#submissions .mg-line-rollover-circle.mg-line" + d.values[0].line_id + "-color").get(0);
         var seen = {}; var entries = d.values.filter(function(entry) {
           if (seen[entry.line_id]) return false;
@@ -379,7 +379,7 @@ function displayEvolutions(lines, submissionLines, useSubmissionDate) {
         lineList = entries.map(function(entry) { return submissionLines[entry.line_id - 1]; });
         values = entries.map(function(entry) { return entry.value; });
       } else {
-        date = d.date - timezoneOffset;
+        date = d.date - timezoneOffsetMinutes * 60 * 1000;
         rolloverCircle = $("#submissions .mg-line-rollover-circle").get(0);
         lineList = [submissionLines[d.line_id - 1]];
         values = [d.value];
