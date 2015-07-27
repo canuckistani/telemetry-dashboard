@@ -34,6 +34,7 @@ $(function() { Telemetry.init(function() {
   if (gInitialPageState.compare !== undefined) { $("#compare").multiselect("select", gInitialPageState.compare); }
   
   $("input[name=cumulative-toggle][value=" + (gInitialPageState.cumulative !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
+  $("input[name=trim-toggle][value=" + (gInitialPageState.trim !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   
@@ -129,8 +130,8 @@ $(function() { Telemetry.init(function() {
       }, 0);
     });
     
-    $("#selected-key1, #selected-key2, #selected-key3, #selected-key4").change(function(e) {
-      if (gCurrentHistogramsList.length > 1) { // Keyed histogram with multiple keys
+    $("#selected-key1, #selected-key2, #selected-key3, #selected-key4, input[name=cumulative-toggle], input[name=trim-toggle]").change(function(e) {
+      if (gCurrentHistogramsList.length > 1) { // Keyed histogram with multiple keys, find the selected keys
         var histogramsList = [];
         var keys = $("#selected-key1, #selected-key2, #selected-key3, #selected-key4").each(function(i, selector) {
           var key = $(selector).val();
@@ -141,17 +142,12 @@ $(function() { Telemetry.init(function() {
       } else { // Non-keyed histogram or a keyed histogram with only one key
         var histogramsList = gCurrentHistogramsList;
       }
-      displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
+      displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0", $("input[name=trim-toggle]:checked").val() !== "0");
       saveStateToUrlAndCookie();
     });
 
     // Perform a full display refresh
     $("#measure").trigger("change");
-  });
-
-  $("input[name=cumulative-toggle]").change(function() {
-    displayHistograms(gCurrentHistogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0");
-    saveStateToUrlAndCookie();
   });
   
   // Automatically resize range bar
@@ -387,8 +383,9 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
   }
 }
 
-function displayHistograms(histogramsList, dates, cumulative) {
-  cumulative = cumulative || false;
+function displayHistograms(histogramsList, dates, cumulative, trim) {
+  cumulative = cumulative === undefined ? false : cumulative;
+  trim = trim === undefined ? true : trim;
   if (histogramsList.length <= 1) { // Only one histograms set
     if (histogramsList.length === 1 && histogramsList[0].histograms.length === 1) { // Only show one set of axes
       var histogram = histogramsList[0].histograms[0];
@@ -422,9 +419,9 @@ function displayHistograms(histogramsList, dates, cumulative) {
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
     
     if (histogramsList.length > 0) {
-      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, histogramsList[0].title, cumulative);
+      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, histogramsList[0].title, cumulative, trim);
     } else {
-      displaySingleHistogramSet($("#distribution1").get(0), [], "", cumulative);
+      displaySingleHistogramSet($("#distribution1").get(0), [], "", cumulative, trim);
     }
   }
   else { // Show all four axes
@@ -435,15 +432,15 @@ function displayHistograms(histogramsList, dates, cumulative) {
       axesContainer.find("h3").show(); // Show the graph title to allow key selection
       var entry = histogramsList[i] || null;
       if (entry !== null) {
-        displaySingleHistogramSet(axes, entry.histograms, entry.title, cumulative);
+        displaySingleHistogramSet(axes, entry.histograms, entry.title, cumulative, trim);
       } else {
-        displaySingleHistogramSet(axes, [], null, cumulative);
+        displaySingleHistogramSet(axes, [], null, cumulative, trim);
       }
     });
   }
 }
 
-function displaySingleHistogramSet(axes, histograms, title, cumulative) {
+function displaySingleHistogramSet(axes, histograms, title, cumulative, trim) {
   // No histograms available
   if (histograms.length === 0) {
     MG.data_graphic({
@@ -467,6 +464,24 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative) {
       var total = 0;
       return counts.map(function(count) { return total += count; });
     });
+  }
+
+  if (trim) { // Trim buckets on both ends in the histogram if their counts are too low
+    var countList = countsList[0].map(function(count, i) { // List of the total number of samples for each bucket
+      var bucketCount = 0;
+      countsList.forEach(function(counts, j) { bucketCount += counts[i]; });
+      return bucketCount;
+    });
+    var total = countList.reduce(function(total, count) { return total + count; }, 0);
+    var countCutoff = total * 0.0001; // Set the samples cutoff to 0.01% of the total samples
+    while (countList[0] < countCutoff) {
+      countList.shift(); countsList.forEach(function(counts) { counts.shift(); });
+      starts.shift(); ends.shift();
+    }
+    while (countList[countList.length - 1] < countCutoff) {
+      countList.pop(); countsList.forEach(function(counts) { counts.pop(); });
+      starts.pop(); ends.pop();
+    }
   }
 
   var distributionSamples = countsList.map(function(counts, i) {
@@ -596,6 +611,7 @@ function saveStateToUrlAndCookie() {
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
+    trim: $("input[name=trim-toggle]:checked").val() !== "0" ? 1 : 0,
     start_date: moment(picker.startDate).format("YYYY-MM-DD"),
     end_date: moment(picker.endDate).format("YYYY-MM-DD"),
     

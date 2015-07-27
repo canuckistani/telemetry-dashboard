@@ -487,7 +487,7 @@ var Line = (function(){
 // Save the current state to the URL and the page cookie
 var gPreviousDisqusIdentifier = null;
 function saveStateToUrlAndCookie() {
-  var startDate = gInitialPageState.start_date, endDate = gInitialPageState.end_date, cumulative = gInitialPageState.cumulative;
+  var startDate = gInitialPageState.start_date, endDate = gInitialPageState.end_date, cumulative = gInitialPageState.cumulative, trim = gInitialPageState.trim;
   gInitialPageState = {
     aggregates: $("#aggregates").val() || [],
     measure: $("#measure").val(),
@@ -502,6 +502,7 @@ function saveStateToUrlAndCookie() {
   if (startDate !== undefined) { gInitialPageState.start_date = startDate; }
   if (endDate !== undefined) { gInitialPageState.end_date = endDate; }
   if (cumulative !== undefined) { gInitialPageState.cumulative = cumulative; }
+  if (trim !== undefined) { gInitialPageState.trim = trim; }
 
   // Only store these in the state if they are not all selected
   var selected = $("#filter-arch").val() || [];
