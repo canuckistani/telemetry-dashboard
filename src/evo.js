@@ -546,10 +546,7 @@ function saveStateToUrlAndCookie() {
   }
   
   // Reload Disqus comments for the new page state
-  var identifier = gInitialPageState.measure + "@" + gInitialPageState.min_channel_version + "@" + gInitialPageState.max_channel_version + "@" +
-                   gInitialPageState.product + "@" + gInitialPageState.use_submission_date + "@" +
-                   gInitialPageState.cumulative + "@" + gInitialPageState.sanitize + "@" +
-                   (gInitialPageState.os || "") + "@" + (gInitialPageState.arch || "");
+  var identifier = "evo@" + gInitialPageState.measure;
   if (identifier !== gPreviousDisqusIdentifier) {
     gPreviousDisqusIdentifier = identifier;
     DISQUS.reset({
