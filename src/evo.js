@@ -204,7 +204,7 @@ function getHistogramEvolutionLines(channel, version, measure, aggregates, filte
     Telemetry.getEvolution(channel, version, measure, filterSet, useSubmissionDate, function(evolutionsMap) {
       filtersCount ++;
       indicate("Updating evolution for " + channel + " " + version + "... " + Math.round(100 * filtersCount / filterSets.length) + "%");
-      if (evolutionsMap !== null) {
+      if (evolutionsMap[""] !== undefined) {
         if (finalEvolution === null) { finalEvolution = evolutionsMap[""]; }
         else { finalEvolution = finalEvolution.combine(evolutionsMap[""]); }
       }
