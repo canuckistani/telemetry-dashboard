@@ -35,7 +35,8 @@ $(function() { Telemetry.init(function() {
 
   indicate("Updating filters...");
   updateOptions(function(filterOptions) {
-    $("#filter-product").multiselect("select", gInitialPageState.product);
+    if (gInitialPageState.product !== null) { $("#filter-product").multiselect("select", gInitialPageState.product); }
+    else { $("#filter-product").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.arch !== null) { $("#filter-arch").multiselect("select", gInitialPageState.arch); }
     else { $("#filter-arch").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.e10s !== null) { $("#filter-e10s").multiselect("select", gInitialPageState.e10s); }
@@ -97,17 +98,7 @@ $(function() { Telemetry.init(function() {
           }
           gPreviousFilterAllSelected[$this.attr("id")] = selected.length === options.length; // Store state
         }
-        
-        // Update CSS classes for labels marking whether they are all selected
-        var allSelectedOSList = compressOSs().filter(function(os) { return os.indexOf(",") < 0; }); // List of all OSs that are all selected
-        var selector = $("#filter-os").next().find(".multiselect-container");
-        selector.find(".multiselect-group-clickable").removeClass("all-selected");
-        var optionsMap = {};
-        getHumanReadableOptions("os", allSelectedOSList).forEach(function(option) { optionsMap[option[0]] = option[1]; });
-        allSelectedOSList.forEach(function(os) {
-          var optionGroupLabel = selector.find(".multiselect-group-clickable:contains('" + optionsMap[os] + "')");
-          optionGroupLabel.addClass("all-selected");
-        });
+        updateOSs();
         
         calculateEvolutions(function(lines, submissionLines, evolutionDescription) {
           $("#submissions-title").text($("#measure").val() + " submissions");
@@ -493,7 +484,6 @@ function saveStateToUrlAndCookie() {
     measure: $("#measure").val(),
     min_channel_version: $("#min-channel-version").val(),
     max_channel_version: $("#max-channel-version").val(),
-    product: $("#filter-product").val() || [],
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
   };
@@ -505,10 +495,12 @@ function saveStateToUrlAndCookie() {
   if (trim !== undefined) { gInitialPageState.trim = trim; }
 
   // Only store these in the state if they are not all selected
-  var selected = $("#filter-arch").val() || [];
-  if (selected.length !== $("#filter-arch option").size()) { gInitialPageState.arch = selected; }
+  var selected = $("#filter-product").val() || [];
+  if (selected.length !== $("#filter-product option").size()) { gInitialPageState.product = selected; }
   var selected = $("#filter-os").val() || [];
   if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = compressOSs(); }
+  var selected = $("#filter-arch").val() || [];
+  if (selected.length !== $("#filter-arch option").size()) { gInitialPageState.arch = selected; }
   var selected = $("#filter-e10s").val() || [];
   if (selected.length !== $("#filter-e10s option").size()) { gInitialPageState.e10s = selected; }
   var selected = $("#filter-process-type").val() || [];

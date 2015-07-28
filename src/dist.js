@@ -39,7 +39,8 @@ $(function() { Telemetry.init(function() {
   $("input[name=sanitize-toggle][value=" + (gInitialPageState.sanitize !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   
   updateOptions(function() {
-    $("#filter-product").multiselect("select", gInitialPageState.product);
+    if (gInitialPageState.product !== null) { $("#filter-product").multiselect("select", gInitialPageState.product); }
+    else { $("#filter-product").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.arch !== null) { $("#filter-arch").multiselect("select", gInitialPageState.arch); }
     else { $("#filter-arch").multiselect("selectAll", false).multiselect("updateButtonText"); }
     if (gInitialPageState.e10s !== null) { $("#filter-e10s").multiselect("select", gInitialPageState.e10s); }
@@ -76,17 +77,7 @@ $(function() { Telemetry.init(function() {
           }
           gPreviousFilterAllSelected[$this.attr("id")] = selected.length === options.length; // Store state
         }
-
-        // Update CSS classes for labels marking whether they are all selected
-        var allSelectedOSList = compressOSs().filter(function(os) { return os.indexOf(",") < 0; }); // List of all OSs that are all selected
-        var selector = $("#filter-os").next().find(".multiselect-container");
-        selector.find(".multiselect-group-clickable").removeClass("all-selected");
-        var optionsMap = {};
-        getHumanReadableOptions("os", allSelectedOSList).forEach(function(option) { optionsMap[option[0]] = option[1]; });
-        allSelectedOSList.forEach(function(os) {
-          var optionGroupLabel = selector.find(".multiselect-group-clickable:contains('" + optionsMap[os] + "')");
-          optionGroupLabel.addClass("all-selected");
-        });
+        updateOSs();
         
         calculateHistograms(function(histogramsMap, evolutionsMap) {
           // histogramsMap is a mapping from keyed histogram keys (or "" if not a keyed histogram) to lists of histograms (one per comparison option, so each histogram in a list has the same buckets)
@@ -607,7 +598,6 @@ function saveStateToUrlAndCookie() {
   gInitialPageState = {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
-    product: $("#filter-product").val() || [],
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
@@ -626,6 +616,8 @@ function saveStateToUrlAndCookie() {
   if (selected.length > 0) { gInitialPageState.keys = selected; }
 
   // Only store these in the state if they are not all selected
+  var selected = $("#filter-product").val() || [];
+  if (selected.length !== $("#filter-product option").size()) { gInitialPageState.product = selected; }
   var selected = $("#filter-os").val() || [];
   if (selected.length !== $("#filter-os option").size()) { gInitialPageState.os = compressOSs(); }
   var selected = $("#filter-arch").val() || [];
