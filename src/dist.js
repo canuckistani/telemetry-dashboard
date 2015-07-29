@@ -106,14 +106,21 @@ $(function() { Telemetry.init(function() {
           });
           gCurrentHistogramsList = histogramsList;
           
-          // Set up key selectors
-          gAxesSelectors.forEach(function(selector) {
-            multiselectSetOptions(selector, getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; })));
+          // Set up key selectors, selecting the previously selected key if it still exists and the first key otherwise
+          gAxesSelectors.forEach(function(selector, i) {
+            var selected = selector.val();
+            var options = getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; }));
+            multiselectSetOptions(selector, options);
+            selector.multiselect("select", options[i][0]);
+            options.forEach(function(pair) {
+              if (pair[0] === selected) { selector.multiselect("select", selected); }
+            });
+            
           });
           if (gInitialPageState.keys) { // Selected key
             gInitialPageState.keys.forEach(function(key, i) {
               if (key !== undefined) { gAxesSelectors[i].multiselect("select", key); }
-            })
+            });
           }
           
           $("#selected-key1").trigger("change");
