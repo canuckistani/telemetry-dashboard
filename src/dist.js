@@ -566,17 +566,45 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       x_accessor: "value", y_accessor: "count",
       xax_format: function(index) { return formatNumber(starts[index]); },
       yax_format: function(value) { return value + "%"; },
+      aggregate_rollover: true,
       mouseover: function(d, i) {
-        var rolloverCircle = $(axes).find(".mg-line-rollover-circle.mg-area" + d.line_id + "-color").get(0);
-        var histogram = histograms[d.line_id - 1];
-        var count = formatNumber(countsList[d.line_id - 1][d.value]), percentage = Math.round(d.count * 100) / 100 + "%";
-        var label;
-        if (ends[d.value] === Infinity) {
-         label = count + " samples (" + percentage + " of all " + histogram.measure + ") where sample value \u2265 " + formatNumber(cumulative ? 0 : starts[d.value]);
+        var rolloverCircle, entries;
+        var start, end;
+        if (d.values) {
+          start = starts[d.values[0].value]; end = ends[d.values[0].value];
+          rolloverCircle = $(axes).find(".mg-line-rollover-circle.mg-area" + d.values[0].line_id + "-color").get(0);
+          entries = d.values.map(function(datum) {
+            return {
+              measure: histograms[datum.line_id - 1].measure,
+              count: formatNumber(countsList[datum.line_id - 1][datum.value]),
+              percentage: Math.round(datum.count * 100) / 100 + "%",
+              colorClass: "mg-line" + datum.line_id + "-color",
+            };
+          });
         } else {
-         label = count + " samples (" + percentage + " of all " + histogram.measure + ") where " + formatNumber(cumulative ? 0 : starts[d.value]) + " \u2264 sample value < " + formatNumber(ends[d.value]);
+          start = starts[d.value]; end = ends[d.value];
+          rolloverCircle = $(axes).find(".mg-line-rollover-circle.mg-area" + d.line_id + "-color").get(0);
+          entries = [{
+            measure: histograms[d.line_id - 1].measure,
+            count: formatNumber(countsList[d.line_id - 1][d.value]),
+            percentage: Math.round(d.count * 100) / 100 + "%",
+            colorClass: "mg-line" + d.line_id + "-color",
+          }];
         }
-        var legend = d3.select(axes).select(".mg-active-datapoint").text(label).style("fill", "white");
+        var labelValue = (
+          end === Infinity ?
+          "sample value \u2265 " + formatNumber(cumulative ? 0 : start) :
+          formatNumber(cumulative ? 0 : start) + " \u2264 sample value < " + formatNumber(end)
+        ) + ":";
+        var legend = d3.select(axes).select(".mg-active-datapoint").text(labelValue).style("fill", "white");
+        var lineHeight = 1.1;
+        entries.forEach(function(entry, i) {
+          var lineIndex = i + 1;
+          var label = legend.append("tspan").attr({x: 0, y: (lineIndex * lineHeight) + "em"})
+            .text(entry.count + " samples (" + entry.percentage + " of all " + entry.measure + ")");
+          legend.append("tspan").attr({x: -label.node().getComputedTextLength(), y: (lineIndex * lineHeight) + "em"})
+            .text("\u2014 ").style({"font-weight": "bold"}).classed(entry.colorClass, true);
+        });
         
         // Reposition element
         var x = parseInt(rolloverCircle.getAttribute("cx")) + 20, y = 40;
