@@ -125,7 +125,10 @@ $(function() { Telemetry.init(function() {
           });
           if (gInitialPageState.keys) { // Selected key
             gInitialPageState.keys.forEach(function(key, i) {
-              if (key !== undefined) { gAxesSelectors[i].multiselect("select", key); }
+              if (key !== undefined) {
+                gAxesSelectors[i].next().find("input[type=radio]").attr("checked", false);
+                gAxesSelectors[i].multiselect("select", key);
+              }
             });
           }
           
