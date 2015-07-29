@@ -115,7 +115,6 @@ $(function() { Telemetry.init(function() {
               var submissions2 = entry2.histograms.reduce(function(total, histogram) { return total + histogram.count }, 0);
               return submissions2 - submissions1;
             }).map(function(entry) { return entry.title; });
-            console.log(keys)
             var options = getHumanReadableOptions("key", keys);
             multiselectSetOptions(selector, options);
             if (i < options.length) { selector.multiselect("select", options[i][0]); }
