@@ -33,6 +33,7 @@ $(function() { Telemetry.init(function() {
   if (gInitialPageState.max_channel_version !== undefined) { $("#channel-version").multiselect("select", gInitialPageState.max_channel_version); }
   if (gInitialPageState.compare !== undefined) { $("#compare").multiselect("select", gInitialPageState.compare); }
   
+  $("input[name=table-toggle][value=" + (gInitialPageState.table !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=cumulative-toggle][value=" + (gInitialPageState.cumulative !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=trim-toggle][value=" + (gInitialPageState.trim !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
   $("input[name=build-time-toggle][value=" + (gInitialPageState.use_submission_date !== 0 ? 1 : 0) + "]").prop("checked", true).trigger("change");
@@ -111,7 +112,7 @@ $(function() { Telemetry.init(function() {
             var selected = selector.val();
             var options = getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; }));
             multiselectSetOptions(selector, options);
-            selector.multiselect("select", options[i][0]);
+            if (i < options.length) { selector.multiselect("select", options[i][0]); }
             options.forEach(function(pair) {
               if (pair[0] === selected) { selector.multiselect("select", selected); }
             });
@@ -128,7 +129,7 @@ $(function() { Telemetry.init(function() {
       }, 0);
     });
     
-    $("#selected-key1, #selected-key2, #selected-key3, #selected-key4, input[name=cumulative-toggle], input[name=trim-toggle]").change(function(e) {
+    $("#selected-key1, #selected-key2, #selected-key3, #selected-key4, input[name=table-toggle], input[name=cumulative-toggle], input[name=trim-toggle]").change(function(e) {
       if (gCurrentHistogramsList.length > 1) { // Keyed histogram with multiple keys, find the selected keys
         var histogramsList = [];
         var keys = $("#selected-key1, #selected-key2, #selected-key3, #selected-key4").each(function(i, selector) {
@@ -140,7 +141,7 @@ $(function() { Telemetry.init(function() {
       } else { // Non-keyed histogram or a keyed histogram with only one key
         var histogramsList = gCurrentHistogramsList;
       }
-      displayHistograms(histogramsList, gCurrentDates, $("input[name=cumulative-toggle]:checked").val() !== "0", $("input[name=trim-toggle]:checked").val() !== "0");
+      displayHistograms(histogramsList, gCurrentDates, $("input[name=table-toggle]:checked").val() !== "0", $("input[name=cumulative-toggle]:checked").val() !== "0", $("input[name=trim-toggle]:checked").val() !== "0");
       saveStateToUrlAndCookie();
     });
 
@@ -324,7 +325,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
     }
     
     // If advanced settings are not at their defaults, expand the settings pane on load
-    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 ||
+    if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.table !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 ||
       startMoment !== minMoment || endMoment !== maxMoment) {
       $("#advanced-settings-toggle").click();
     }
@@ -381,7 +382,7 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
   }
 }
 
-function displayHistograms(histogramsList, dates, cumulative, trim) {
+function displayHistograms(histogramsList, dates, useTable, cumulative, trim) {
   cumulative = cumulative === undefined ? false : cumulative;
   trim = trim === undefined ? true : trim;
   if (histogramsList.length <= 1) { // Only one histograms set
@@ -417,9 +418,9 @@ function displayHistograms(histogramsList, dates, cumulative, trim) {
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
     
     if (histogramsList.length > 0) {
-      displaySingleHistogramSet($("#distribution1").get(0), histogramsList[0].histograms, histogramsList[0].title, cumulative, trim);
+      displaySingleHistogramSet($("#distribution1").get(0), useTable, histogramsList[0].histograms, histogramsList[0].title, cumulative, trim);
     } else {
-      displaySingleHistogramSet($("#distribution1").get(0), [], "", cumulative, trim);
+      displaySingleHistogramSet($("#distribution1").get(0), useTable, [], "", cumulative, trim);
     }
   }
   else { // Show all four axes
@@ -430,15 +431,15 @@ function displayHistograms(histogramsList, dates, cumulative, trim) {
       axesContainer.find("h3").show(); // Show the graph title to allow key selection
       var entry = histogramsList[i] || null;
       if (entry !== null) {
-        displaySingleHistogramSet(axes, entry.histograms, entry.title, cumulative, trim);
+        displaySingleHistogramSet(axes, useTable, entry.histograms, entry.title, cumulative, trim);
       } else {
-        displaySingleHistogramSet(axes, [], null, cumulative, trim);
+        displaySingleHistogramSet(axes, useTable, [], null, cumulative, trim);
       }
     });
   }
 }
 
-function displaySingleHistogramSet(axes, histograms, title, cumulative, trim) {
+function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative, trim) {
   // No histograms available
   if (histograms.length === 0) {
     MG.data_graphic({
@@ -482,6 +483,12 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative, trim) {
     }
   }
 
+  if (useTable) { // Display the histogram as a table rather than a chart
+    displaySingleHistogramTableSet(axes, starts, ends, countsList, histograms);
+    return;
+  }
+  $(axes).empty(); // Remove tables if they are present
+  
   var distributionSamples = countsList.map(function(counts, i) {
     return counts.map(function(count, j) { return {value: j, count: (count / histograms[i].count) * 100}; });
   });
@@ -597,6 +604,41 @@ function displaySingleHistogramSet(axes, histograms, title, cumulative, trim) {
   $(axes).find(".mg-y-axis .label").attr("y", "190").attr("dy", "0");
 }
 
+function displaySingleHistogramTableSet(axes, starts, ends, countsList, histograms) {
+  $(axes).empty().append(
+    $("<div></div>").css("margin", "30px 250px 0 130px").append(
+      $("<table></table>").addClass("table table-striped table-hover").css("width", "auto").css("margin", "0 auto").append([
+        $("<thead></table>").append(
+          $("<tr></tr>").append(
+            [
+              $("<th></th>").text("Start"),
+              $("<th></th>").text("End"),
+            ].concat(
+              histograms.map(function(histogram, i) {
+                return $("<th></th>").text(histogram.measure + " Count");
+              })
+            )
+          )
+        ),
+        $("<tbody></tbody>").append(
+          countsList[0].map(function(count, i) {
+            return $("<tr></tr>").append(
+              [
+                $("<td></td>").text(formatNumber(starts[i])),
+                $("<td></td>").text(formatNumber(ends[i])),
+              ].concat(
+                countsList.map(function(counts) {
+                  return $("<td></td>").text(formatNumber(counts[i]));
+                })
+              )
+            )
+          })
+        ),
+      ])
+    )
+  );
+}
+
 // Save the current state to the URL and the page cookie
 var gPreviousCSVBlobUrl = null, gPreviousJSONBlobUrl = null;
 var gPreviousDisqusIdentifier = null;
@@ -605,6 +647,7 @@ function saveStateToUrlAndCookie() {
   gInitialPageState = {
     measure: $("#measure").val(),
     max_channel_version: $("#channel-version").val(),
+    table: $("input[name=table-toggle]:checked").val() !== "0" ? 1 : 0,
     cumulative: $("input[name=cumulative-toggle]:checked").val() !== "0" ? 1 : 0,
     use_submission_date: $("input[name=build-time-toggle]:checked").val() !== "0" ? 1 : 0,
     sanitize: $("input[name=sanitize-toggle]:checked").val() !== "0" ? 1 : 0,
@@ -681,7 +724,7 @@ function saveStateToUrlAndCookie() {
     var minMoment = start, maxMoment = end;
   }
   
-  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 || start !== minMoment || end !== maxMoment) {
+  if (gInitialPageState.use_submission_date !== 0 || gInitialPageState.table !== 0 || gInitialPageState.cumulative !== 0 || gInitialPageState.trim !== 1 || start !== minMoment || end !== maxMoment) {
     $("#advanced-settings-toggle").find("span").text(" (modified)");
   } else {
     $("#advanced-settings-toggle").find("span").text("");
