@@ -110,7 +110,13 @@ $(function() { Telemetry.init(function() {
           // Set up key selectors, selecting the previously selected key if it still exists and the first key otherwise
           gAxesSelectors.forEach(function(selector, i) {
             var selected = selector.val();
-            var options = getHumanReadableOptions("key", histogramsList.map(function(entry) { return entry.title; }));
+            var keys = histogramsList.sort(function(entry1, entry2) {
+              var submissions1 = entry1.histograms.reduce(function(total, histogram) { return total + histogram.count }, 0);
+              var submissions2 = entry2.histograms.reduce(function(total, histogram) { return total + histogram.count }, 0);
+              return submissions2 - submissions1;
+            }).map(function(entry) { return entry.title; });
+            console.log(keys)
+            var options = getHumanReadableOptions("key", keys);
             multiselectSetOptions(selector, options);
             if (i < options.length) { selector.multiselect("select", options[i][0]); }
             options.forEach(function(pair) {
@@ -592,7 +598,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
     });
   }
   
-    // Reposition and resize text
+  // Reposition and resize text
   $(axes).find(".mg-x-axis .label").attr("dy", "1.2em");
   $(axes).find(".mg-x-axis text:not(.label)").each(function(i, text) { // Axis tick labels
     if ($(text).text() === "NaN") { text.parentNode.removeChild(text); } // Remove "NaN" labels resulting from interpolation in histogram labels
