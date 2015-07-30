@@ -288,7 +288,24 @@ Telemetry.init = function Telemetry_init(callback) {
       });
     });
   });
-},
+}
+
+Telemetry.getHistogramInfo = function Telemetry_getHistogramInfo(channel, version, metric, useSubmissionDate, callback) {
+  assert(Telemetry.CHANNEL_VERSION_DATES !== null && Telemetry.CHANNEL_VERSION_BUILDIDS !== null, "Telemetry.js must be initialized before use");
+  assert(typeof channel === "string", "`channel` must be a string");
+  assert(typeof version === "string", "`version` must be a string");
+  assert(typeof metric === "string", "`metric` must be a string");
+  assert(typeof callback === "function", "`callback` must be a function");
+  var dates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES : Telemetry.CHANNEL_VERSION_BUILDIDS)[channel][version];
+  var dates = Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version].slice()
+  var buildDate = dates[0];
+  var variable = useSubmissionDate ? "submission_date" : "build_id";
+  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel + "/?version=" + encodeURIComponent(version) +
+    "&dates=" + buildDate + "&metric=" + encodeURIComponent(metric), function(histograms, status) {
+    assert(histograms !== null, "Could not obtain histogram info: status " + status);
+    callback(histograms.kind, histograms.description, histograms.buckets, dates);
+  });
+}
 
 Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metric, filters, useSubmissionDate, callback) {
   assert(Telemetry.CHANNEL_VERSION_DATES !== null && Telemetry.CHANNEL_VERSION_BUILDIDS !== null, "Telemetry.js must be initialized before use");
@@ -297,15 +314,14 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
   assert(typeof metric === "string", "`metric` must be a string");
   assert(typeof filters === "object", "`filters` must be an object");
   assert(typeof callback === "function", "`callback` must be a function");
-  var buildDates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES[channel][version]
-                                      : Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version]).join(",");
+  var dates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES : Telemetry.CHANNEL_VERSION_BUILDIDS)[channel][version].join(",");
   var filterString = "";
   Object.keys(filters).sort().forEach(function(filterName) { // we need to sort the keys in order to make sure the same filters result in the same URL each time, for caching
     filterString += "&" + encodeURIComponent(filterName) + "=" + encodeURIComponent(filters[filterName]);
   });
   var variable = useSubmissionDate ? "submission_date" : "build_id";
   Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel +
-    "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(buildDates) +
+    "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(dates) +
     "&metric=" + encodeURIComponent(metric) + filterString, function(histograms, status) {
     if (histograms === null) {
       assert(status === 404, "Could not obtain evolution: status " + status); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
@@ -325,7 +341,7 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
   });
 }
 
-Telemetry.getFilterOptions = function Telemetry_getOptions(channel, version, callback) {
+Telemetry.getFilterOptions = function Telemetry_getFilterOptions(channel, version, callback) {
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
