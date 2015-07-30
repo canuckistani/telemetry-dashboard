@@ -481,11 +481,11 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
     });
     var total = countList.reduce(function(total, count) { return total + count; }, 0);
     var countCutoff = total * 0.0001; // Set the samples cutoff to 0.01% of the total samples
-    while (countList[0] < countCutoff) {
+    while (countList[0] < countCutoff && countList.length > 2) {
       countList.shift(); countsList.forEach(function(counts) { counts.shift(); });
       starts.shift(); ends.shift();
     }
-    while (countList[countList.length - 1] < countCutoff) {
+    while (countList[countList.length - 1] < countCutoff && countList.length > 2) {
       countList.pop(); countsList.forEach(function(counts) { counts.pop(); });
       starts.pop(); ends.pop();
     }
