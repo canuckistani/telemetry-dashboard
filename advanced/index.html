@@ -267,8 +267,13 @@
             - telemetry.mozilla.org/v1/telemetry.js
         (we'll try to keep it backwards compatible)
      -->
-    <script src="../v1/big.js"></script>
-    <script src="../v1/telemetry.js"></script>
+    <!--<script src="../v1/big.js"></script>
+    <script src="../v1/telemetry.js"></script>-->
+    <script src="../v2/telemetry.js"></script>
+    <script src="../v2/v1-shim.js"></script>
+    <script>
+    Telemetry = new TelemetryShim(Telemetry);
+    </script>
 
     <!--
         telemetry.jquery.js and jQuery UI widget factory for stateful plugins.

@@ -329,7 +329,7 @@ $.widget("telemetry.histogramfilter", {
     return prettyNames.hasOwnProperty(filterName) ? prettyNames[filterName] : "Any " + filterName;
   },
   
-  _systemNames: {"WINNT": "Windows", "Darwin": "OS X"},
+  _systemNames: {"Windows_NT": "Windows", "Darwin": "OS X"},
   _windowsVersionNames: {"5.0": "2000", "5.1": "XP", "5.2": "XP Pro x64", "6.0": "Vista", "6.1": "7", "6.2": "8", "6.3": "8.1", "6.4": "10 (Tech Preview)", "10.0": "10"},
   _windowsVersionOrder: {"5.0": 0, "5.1": 1, "5.2": 2, "6.0": 3, "6.1": 4, "6.2": 5, "6.3": 6, "6.4": 7, "10.0": 8},
   _darwinVersionPrefixes: {
@@ -337,7 +337,7 @@ $.widget("telemetry.histogramfilter", {
     "7.": "Panther", "8.": "Tiger", "9.": "Leopard", "10.": "Snow Leopard",
     "11.": "Lion", "12.": "Mountain Lion", "13.": "Mavericks", "14.": "Yosemite",
   },
-  _ignoredOSNames: {"Windows_95": true, "Windows_98": true, "Windows_NT": true},
+  _ignoredOSNames: {"Windows_95": true, "Windows_98": true},
   _archNames: {"x86": "32-bit", "x86-64": "64-bit"},
   _getHumanReadableOptions: function histogramfilter__getHumanReadableOptions(filterName, options, os) {
     if (filterName === "OS") {
@@ -351,7 +351,7 @@ $.widget("telemetry.histogramfilter", {
       });
     } else if (filterName === "osVersion") {
       var system = os || this._getStarName("OS");
-      if (system === "WINNT") {
+      if (system === "Windows_NT") {
         var versionNames = this._windowsVersionNames;
         var versionOrder = this._windowsVersionOrder;
         var starName = this._getStarName(filterName);
