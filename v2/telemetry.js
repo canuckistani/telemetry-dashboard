@@ -297,7 +297,6 @@ Telemetry.getHistogramInfo = function Telemetry_getHistogramInfo(channel, versio
   assert(typeof metric === "string", "`metric` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
   var dates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES : Telemetry.CHANNEL_VERSION_BUILDIDS)[channel][version];
-  var dates = Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version].slice()
   var buildDate = dates[0];
   var variable = useSubmissionDate ? "submission_date" : "build_id";
   Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel + "/?version=" + encodeURIComponent(version) +
@@ -364,7 +363,10 @@ Telemetry.getVersions = function Telemetry_getVersions(fromVersion, toVersion) {
   var versions = [];
   for (var channel in Telemetry.CHANNEL_VERSION_DATES) {
     for (var version in Telemetry.CHANNEL_VERSION_DATES[channel]) {
-      versions.push(channel + "/" + version);
+      // Only output a channel/version if it is in both the buildID versions and the submission date versions (sometimes there is invalid data where a version is in submission date versions but not buildID versions, see https://bugzilla.mozilla.org/show_bug.cgi?id=1189727)
+      if (Telemetry.CHANNEL_VERSION_BUILDIDS[channel] && Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version]) {
+        versions.push(channel + "/" + version);
+      }
     }
   }
   versions.sort();
