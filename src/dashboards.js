@@ -164,7 +164,7 @@ function loadStateFromUrlAndCookie() {
     pageState.e10s.split("!").filter(function(v) { return v !== ""; }) : null;
   pageState.processType = typeof pageState.processType === "string" && pageState.processType !== "" && pageState.processType !== "null" ?
     pageState.processType.split("!").filter(function(v) { return v !== ""; }) : null;
-  pageState.compare = typeof pageState.compare === "string" && ["", "os", "architecture", "e10sEnabled", "child"].indexOf(pageState.compare) >= 0 ?
+  pageState.compare = typeof pageState.compare === "string" && ["", "os", "osVersion", "architecture", "e10sEnabled", "child"].indexOf(pageState.compare) >= 0 ?
     pageState.compare : "";
   
   pageState.keys = typeof pageState.keys === "string" ? pageState.keys.split("!") : [];
@@ -240,10 +240,15 @@ function getFilterSetsMapping(filters, comparisonName) {
   if (comparisonName === null) {
     filterSetsMapping["*"] = getFilterSets(filterMapping);
   } else {
-    var comparisonValues = comparisonName === "os" ? compressOSs() : filters[comparisonName].val() || [];
+    var comparisonValues; // List of options, each of which needs an entry to compare by
+    switch (comparisonName) {
+      case "os": comparisonValues = compressOSs(); break;
+      case "osVersion": comparisonValues = filters["os"].val() || []; break;
+      default: comparisonValues = filters[comparisonName].val() || []; break;
+    }
     comparisonValues.forEach(function(comparisonValue) {
       filterSetsMapping[comparisonValue] = getFilterSets(filterMapping).map(function(filterSet) {
-        if (comparisonName === "os") {
+        if (comparisonName === "os" || comparisonName === "osVersion") {
           if (comparisonValue.indexOf(",") >= 0) { // we have an OS value like "Windows_NT,6.1", and we want to set the os filter to Windows_NT and the osVersion filter to 6.1
             var parts = comparisonValue.split(",");
             filterSet["os"] = parts[0]; filterSet["osVersion"] = parts[1];
@@ -274,7 +279,7 @@ function getHumanReadableOptions(filterName, options) {
   var archNames = {"x86": "32-bit", "x86-64": "64-bit"};
   var e10sNames = {"false": "no e10s", "true": "e10s"};
   var processTypeNames = {"false": "main process", "true": "child process"};
-  if (filterName === "os") {
+  if (filterName === "os" || filterName === "osVersion") {
     var entries = options.map(function(option) {
       var parts = option.split(",");
       return {
