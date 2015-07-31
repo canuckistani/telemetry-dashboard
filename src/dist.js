@@ -555,6 +555,8 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       yTick.setAttribute("x2", x2);
     });
   } else { // Multiple histograms available, display as overlaid lines
+    var goodColors = ["#FCC376", "#EE816A", "#5C8E6F", "#030303", "#93AE9F", "#E7DB8F", "#9E956A", "#FFB284", "#4BB4A3", "#32506C", "#77300F", "#C8B173"];
+    var colors = countsList.map(function(counts, i) { return goodColors[i % goodColors.length]; });
     MG.data_graphic({
       data: distributionSamples,
       chart_type: "line",
@@ -580,7 +582,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
               measure: histograms[datum.line_id - 1].measure,
               count: formatNumber(countsList[datum.line_id - 1][datum.value]),
               percentage: Math.round(datum.count * 100) / 100 + "%",
-              colorClass: "mg-line" + datum.line_id + "-color",
+              color: colors[datum.line_id - 1],
             };
           });
         } else {
@@ -590,7 +592,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
             measure: histograms[d.line_id - 1].measure,
             count: formatNumber(countsList[d.line_id - 1][d.value]),
             percentage: Math.round(d.count * 100) / 100 + "%",
-            colorClass: "mg-line" + d.line_id + "-color",
+            color: colors[d.line_id - 1],
           }];
         }
         var labelValue = (
@@ -605,7 +607,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
           var label = legend.append("tspan").attr({x: 0, y: (lineIndex * lineHeight) + "em"})
             .text(entry.count + " samples (" + entry.percentage + " of all " + entry.measure + ")");
           legend.append("tspan").attr({x: -label.node().getComputedTextLength(), y: (lineIndex * lineHeight) + "em"})
-            .text("\u2014 ").style({"font-weight": "bold"}).classed(entry.colorClass, true);
+            .text("\u2014 ").style({"font-weight": "bold", "stroke": entry.color});
         });
         
         // Reposition element
@@ -625,6 +627,12 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       mouseout: function(d, i) {
         d3.select(axes).select(".active-datapoint-background").remove(); // Remove old background
       },
+    });
+    countsList.forEach(function(counts, i) { // Recolor lines with the previously calculated colors
+      var lineIndex = i + 1;
+      $(axes).find(".mg-main-line.mg-line" + lineIndex + "-color").css("stroke", colors[i]);
+      $(axes).find(".mg-area" + lineIndex + "-color, .mg-hover-line" + lineIndex + "-color").css("fill", colors[i]).css("stroke", colors[i]);
+      $(axes).find(".mg-line" + lineIndex + "-legend-color").css("fill", colors[i]);
     });
   }
   
