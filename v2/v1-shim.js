@@ -1,6 +1,12 @@
 (function(exports) {
 "use strict";
 
+console.log("WARNING: This is a shim on top of telemetry.js v2 that exposes the telemetry.js v1 API.");
+console.log("         Upgrading to the standard telemetry.js v2 API is highly recommended.");
+console.log("Certain functionality in this shim is not identical to the v1 API:");
+console.log("  * Telemetry.measures() does not have real kind or description information.");
+console.log("  * Using the values of a histogram or a histogram evolution will make a synchronous network request, which can make the browser temporarily unresponsive.");
+
 var FILTER_ORDER = ["reason", "appName", "OS", "osVersion", "arch"];
 
 function assert(condition, message) {
