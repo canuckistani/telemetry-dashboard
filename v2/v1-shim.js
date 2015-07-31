@@ -1,11 +1,35 @@
 (function(exports) {
 "use strict";
 
-console.log("WARNING: This is a shim on top of telemetry.js v2 that exposes the telemetry.js v1 API.");
-console.log("         Upgrading to the standard telemetry.js v2 API is highly recommended.");
-console.log("Certain functionality in this shim is not identical to the v1 API:");
-console.log("  * Telemetry.measures() does not have real kind or description information.");
-console.log("  * Using the values of a histogram or a histogram evolution will make a synchronous network request, which can make the browser temporarily unresponsive.");
+/*
+Telemetry.js v1 uses the v2 backend, while Telemetry.js v2 uses the v4 backend, and both libraries have an incompatible API. This library wraps Telemetry.js v2 to expose the Telemetry.js v1 API, for compatibility purposes.
+
+Note that using this library is recommended only for compatibility reasons. The full Telemetry.js v2 API has many additional features, such as support for keyed histograms and faster operations.
+
+HOW TO USE THIS SHIM
+====================
+
+Import the shim and Telemetry.js v2 somewhere, replacing this:
+
+    <script src="../v1/telemetry.js"></script>
+
+With this:
+
+    <script src="../v2/telemetry.js"></script>
+    <script src="../v2/v1-shim.js"></script> 
+    <script>Telemetry = new TelemetryShim(Telemetry);</script>
+
+Now, all the code on that page will be running on top of Telemetry.js v2.
+
+Possible compatibility issues when using this shim, vs. using Telemetry.js v1:
+
+* Undocumented APIs (however, the `histogramInstance._filter_path` property is also implemented for convenience).
+* `Telemetry.measures()`: the keys of its return value are measures as expected, but the values are always `{kind: "linear", description: "histogram"}`.
+* `histogramEvolutionInstance.each`, `histogramEvolutionInstance.map`, `histogramInstance.submissions`, `histogramInstance.count`, `histogramInstance.mean`, `histogramInstance.percentile`, `histogramInstance.median`, `histogramInstance.each`, and `histogramInstance.map` can possibly make synchronous network requests, which can make the browser temporarily unresponsive.
+* `histogramInstance.standardDeviation`, `histogramInstance.geometricMean`, and `histogramInstance.geometricStandardDeviation` - all just return 0.
+*/
+
+console.log("WARNING: This library is a shim on top of telemetry.js v2. Upgrading to the telemetry.js v2 API is highly recommended.");
 
 var FILTER_ORDER = ["reason", "appName", "OS", "osVersion", "arch"];
 
@@ -264,9 +288,9 @@ TelemetryShim.HistogramShim = (function() {
   HistogramShim.prototype.submissions = function() { this.getHistogramSync(); return this._Histogram.submissions; };
   HistogramShim.prototype.count = function() { this.getHistogramSync(); return this._Histogram.count; };
   HistogramShim.prototype.mean = function() { this.getHistogramSync(); return this._Histogram.mean(); };
-  HistogramShim.prototype.standardDeviation = function() { throw new Error("Not implemented!"); };
-  HistogramShim.prototype.geometricMean = function() { return 0; }; //wip: not implemented
-  HistogramShim.prototype.geometricStandardDeviation = function() { return 0; }; //wip: not implemented
+  HistogramShim.prototype.standardDeviation = function() { return 0; };
+  HistogramShim.prototype.geometricMean = function() { return 0; };
+  HistogramShim.prototype.geometricStandardDeviation = function() { return 0; };
   HistogramShim.prototype.percentile = function(value) { this.getHistogramSync(); return this._Histogram.percentile(value); };
   HistogramShim.prototype.median = function(value) { this.getHistogramSync(); return this._Histogram.percentile(50); };
   HistogramShim.prototype.each = function(callback, context) { this.getHistogramSync(); this._Histogram.map(callback, context); };
