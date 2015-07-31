@@ -2,7 +2,7 @@
 "use strict";
 
 /*
-Telemetry.js v1 uses the v2 backend, while Telemetry.js v2 uses the v4 backend, and both libraries have an incompatible API. This library wraps Telemetry.js v2 to expose the Telemetry.js v1 API, for compatibility purposes.
+Telemetry.js v1 uses v2 telemetry, while Telemetry.js v2 uses unified FHR/telemetry, and both libraries have an incompatible API. This library wraps Telemetry.js v2 to expose the Telemetry.js v1 API, for compatibility purposes.
 
 Note that using this library is recommended only for compatibility reasons. The full Telemetry.js v2 API has many additional features, such as support for keyed histograms and faster operations.
 
@@ -24,7 +24,7 @@ Now, all the code on that page will be running on top of Telemetry.js v2.
 Possible compatibility issues when using this shim, vs. using Telemetry.js v1:
 
 * Undocumented APIs (however, the `histogramInstance._filter_path` property is also implemented for convenience).
-* `Telemetry.measures()`: the keys of its return value are measures as expected, but the values are always `{kind: "linear", description: "histogram"}`.
+* `Telemetry.measures()`: the keys of its return value are measures as expected, but the values are always null.
 * `histogramEvolutionInstance.each`, `histogramEvolutionInstance.map`, `histogramInstance.submissions`, `histogramInstance.count`, `histogramInstance.mean`, `histogramInstance.percentile`, `histogramInstance.median`, `histogramInstance.each`, and `histogramInstance.map` can possibly make synchronous network requests, which can make the browser temporarily unresponsive.
 * `histogramInstance.standardDeviation`, `histogramInstance.geometricMean`, and `histogramInstance.geometricStandardDeviation` - all just return 0.
 */
@@ -142,12 +142,7 @@ TelemetryShim.prototype.measures = function(channelVersion, callback) {
   return this._Telemetry.getFilterOptions(parts[0], parts[1], function(filterOptions) {
     var measures = filterOptions.metric || [];
     var measureMap = {};
-    measures.forEach(function(measure) {
-      measureMap[measure] = {
-        kind: "linear",
-        description: "histogram", // wip: make this work
-      };
-    });
+    measures.forEach(function(measure) { measureMap[measure] = null; });
     callback(measureMap);
   });
 }

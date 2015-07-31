@@ -297,7 +297,6 @@ Telemetry.getHistogramInfo = function Telemetry_getHistogramInfo(channel, versio
   assert(typeof metric === "string", "`metric` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
   var dates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES : Telemetry.CHANNEL_VERSION_BUILDIDS)[channel][version];
-  var dates = Telemetry.CHANNEL_VERSION_BUILDIDS[channel][version].slice()
   var buildDate = dates[0];
   var variable = useSubmissionDate ? "submission_date" : "build_id";
   Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel + "/?version=" + encodeURIComponent(version) +
