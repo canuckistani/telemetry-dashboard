@@ -298,10 +298,11 @@ Telemetry.getHistogramInfo = function Telemetry_getHistogramInfo(channel, versio
   assert(typeof callback === "function", "`callback` must be a function");
   var dates = (useSubmissionDate ? Telemetry.CHANNEL_VERSION_DATES : Telemetry.CHANNEL_VERSION_BUILDIDS)[channel][version];
   var buildDate = dates[0];
-  var variable = useSubmissionDate ? "submission_date" : "build_id";
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel + "/?version=" + encodeURIComponent(version) +
-    "&dates=" + buildDate + "&metric=" + encodeURIComponent(metric), function(histograms, status) {
-    assert(histograms !== null, "Could not obtain histogram info: status " + status);
+  var url = Telemetry.BASE_URL + "aggregates_by/" + (useSubmissionDate ? "submission_date" : "build_id") +
+    "/channels/" + encodeURIComponent(channel) + "/?version=" + encodeURIComponent(version) + "&dates=" + buildDate +
+    "&metric=" + encodeURIComponent(metric);
+  Telemetry.getJSON(url, function(histograms, status) {
+    assert(histograms !== null, "Could not obtain histogram info: status " + status + " (" + url + ")");
     callback(histograms.kind, histograms.description, histograms.buckets, dates);
   });
 }
@@ -318,12 +319,12 @@ Telemetry.getEvolution = function Telemetry_getEvolution(channel, version, metri
   Object.keys(filters).sort().forEach(function(filterName) { // we need to sort the keys in order to make sure the same filters result in the same URL each time, for caching
     filterString += "&" + encodeURIComponent(filterName) + "=" + encodeURIComponent(filters[filterName]);
   });
-  var variable = useSubmissionDate ? "submission_date" : "build_id";
-  Telemetry.getJSON(Telemetry.BASE_URL + "aggregates_by/" + variable + "/channels/" + channel +
-    "/?version=" + encodeURIComponent(version) + "&dates=" + encodeURIComponent(dates) +
-    "&metric=" + encodeURIComponent(metric) + filterString, function(histograms, status) {
+  var url = Telemetry.BASE_URL + "aggregates_by/" + (useSubmissionDate ? "submission_date" : "build_id") +
+    "/channels/" + encodeURIComponent(channel) + "/?version=" + encodeURIComponent(version) + "&dates=" +
+    encodeURIComponent(dates) + "&metric=" + encodeURIComponent(metric) + filterString;
+  Telemetry.getJSON(url, function(histograms, status) {
     if (histograms === null) {
-      assert(status === 404, "Could not obtain evolution: status " + status); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
+      assert(status === 404, "Could not obtain evolution: status " + status + " (" + url + ")"); // Only allow null evolution if it is 404 - if there is no evolution for the given filters
       callback({});
     } else {
       var entriesMap = {}; // Mapping from entry labels to a list of entries having that label
@@ -344,9 +345,10 @@ Telemetry.getFilterOptions = function Telemetry_getFilterOptions(channel, versio
   assert(typeof channel === "string", "`channel` must be a string");
   assert(typeof version === "string", "`version` must be a string");
   assert(typeof callback === "function", "`callback` must be a function");
-  Telemetry.getJSON(Telemetry.BASE_URL + "filters/?channel=" + encodeURIComponent(channel) + "&version=" + encodeURIComponent(version), function(filterOptions, status) {
+  var url = Telemetry.BASE_URL + "filters/?channel=" + encodeURIComponent(channel) + "&version=" + encodeURIComponent(version);
+  Telemetry.getJSON(url, function(filterOptions, status) {
     if (filterOptions === null) {
-      assert(status === 404, "Could not obtain filter options: status " + status); // Only allow null filter options if it is 404 - if there are no filters
+      assert(status === 404, "Could not obtain filter options: status " + status + " (" + url + ")"); // Only allow null filter options if it is 404 - if there are no filters
       callback({});
     } else {
       filterOptions["metric"] = filterOptions["metric"].filter(function(measure) {
