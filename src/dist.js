@@ -393,6 +393,44 @@ function updateDateRange(callback, dates, updatedByUser, shouldUpdateRangebar) {
 function displayHistograms(histogramsList, dates, useTable, cumulative, trim) {
   cumulative = cumulative === undefined ? false : cumulative;
   trim = trim === undefined ? true : trim;
+
+  var minTrimLeft = 0, minTrimRight = 0, maxPercentage = 0;
+  histogramsList.forEach(function(entry) { // Find the largest percentage on the graph to determine the upper bound for all the graphs
+    if (cumulative) { maxPercentage = 100; } // Cumulative histograms always have a max percentage of 100%
+    else {
+      entry.histograms.forEach(function(histogram) {
+        histogram.map(function(count, start, end, i) {
+          if (100 * count / histogram.count > maxPercentage) { maxPercentage = 100 * count / histogram.count; }
+        });
+      });
+    }
+  });
+
+  if (trim) { // Figure out how much to trim buckets on both ends in the histogram if their counts are too low
+    minTrimLeft = Infinity; minTrimRight = Infinity;
+    histogramsList.forEach(function(entry) {
+      var trimLeft = 0, trimRight = 0;
+      var countsList = entry.histograms.map(function(histogram) {
+        return histogram.map(function(count, start, end, i) { return count; });
+      });
+      if (cumulative) { // Show cumulative histogram by adding up all the previous data points
+        countsList = countsList.map(function(counts) {
+          var total = 0;
+          return counts.map(function(count) { return total += count; });
+        });
+      }
+      var countList = countsList[0].map(function(count) { return 0; });
+      countsList.forEach(function(counts) { counts.forEach(function(count, i) { countList[i] += count; }); });
+      var total = countList.reduce(function(total, count) { return total + count; }, 0);
+      var countCutoff = total * 0.0001; // Set the samples cutoff to 0.01% of the total samples
+      while (countList[trimLeft] < countCutoff && countList.length - trimLeft - trimRight > 2) { trimLeft ++; }
+      while (countList[countList.length - 1 - trimRight] < countCutoff && countList.length - trimLeft - trimRight > 2) { trimRight ++; }
+      if (trimLeft < minTrimLeft) { minTrimLeft = trimLeft; }
+      if (trimRight < minTrimRight) { minTrimRight = trimRight; }
+    });
+  }
+  
+  
   if (histogramsList.length <= 1) { // Only one histograms set
     if (histogramsList.length === 1 && histogramsList[0].histograms.length === 1) { // Only show one set of axes
       var histogram = histogramsList[0].histograms[0];
@@ -426,9 +464,9 @@ function displayHistograms(histogramsList, dates, useTable, cumulative, trim) {
     axesContainer.find("h3").hide(); // Hide the graph title as it doesn't need one
     
     if (histogramsList.length > 0) {
-      displaySingleHistogramSet($("#distribution1").get(0), useTable, histogramsList[0].histograms, histogramsList[0].title, cumulative, trim);
+      displaySingleHistogramSet($("#distribution1").get(0), useTable, histogramsList[0].histograms, histogramsList[0].title, cumulative, minTrimLeft, minTrimRight, maxPercentage);
     } else {
-      displaySingleHistogramSet($("#distribution1").get(0), useTable, [], "", cumulative, trim);
+      displaySingleHistogramSet($("#distribution1").get(0), useTable, [], "", cumulative, minTrimLeft, minTrimRight, maxPercentage);
     }
   }
   else { // Show all four axes
@@ -438,16 +476,16 @@ function displayHistograms(histogramsList, dates, useTable, cumulative, trim) {
       axesContainer.removeClass("col-md-12").addClass("col-md-6").show();
       axesContainer.find("h3").show(); // Show the graph title to allow key selection
       var entry = histogramsList[i] || null;
-      if (entry !== null) {
-        displaySingleHistogramSet(axes, useTable, entry.histograms, entry.title, cumulative, trim);
-      } else {
-        displaySingleHistogramSet(axes, useTable, [], null, cumulative, trim);
+      if (entry !== null) { // Histogram for this entry actually exists, so draw it
+        displaySingleHistogramSet(axes, useTable, entry.histograms, entry.title, cumulative, minTrimLeft, minTrimRight, maxPercentage);
+      } else { // No entry, display missing data
+        displaySingleHistogramSet(axes, useTable, [], null, cumulative, minTrimLeft, minTrimRight, maxPercentage);
       }
     });
   }
 }
 
-function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative, trim) {
+function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative, trimLeft, trimRight, maxPercentage) {
   // No histograms available
   if (histograms.length === 0) {
     MG.data_graphic({
@@ -472,23 +510,15 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       return counts.map(function(count) { return total += count; });
     });
   }
-
-  if (trim) { // Trim buckets on both ends in the histogram if their counts are too low
-    var countList = countsList[0].map(function(count, i) { // List of the total number of samples for each bucket
-      var bucketCount = 0;
-      countsList.forEach(function(counts, j) { bucketCount += counts[i]; });
-      return bucketCount;
-    });
-    var total = countList.reduce(function(total, count) { return total + count; }, 0);
-    var countCutoff = total * 0.0001; // Set the samples cutoff to 0.01% of the total samples
-    while (countList[0] < countCutoff && countList.length > 2) {
-      countList.shift(); countsList.forEach(function(counts) { counts.shift(); });
-      starts.shift(); ends.shift();
-    }
-    while (countList[countList.length - 1] < countCutoff && countList.length > 2) {
-      countList.pop(); countsList.forEach(function(counts) { counts.pop(); });
-      starts.pop(); ends.pop();
-    }
+  while (trimLeft) {
+    starts.shift(); ends.shift();
+    countsList.forEach(function(counts) { counts.shift(); });
+    trimLeft --;
+  }
+  while (trimRight) {
+    starts.pop(); ends.pop();
+    countsList.forEach(function(counts) { counts.pop(); });
+    trimRight --;
   }
 
   if (useTable) { // Display the histogram as a table rather than a chart
@@ -510,6 +540,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       chart_type: "histogram",
       full_width: true, height: $(axes).width() * 0.6,
       left: 70, right: $(axes).width() / (distributionSamples[0].length + 1),
+      max_y: maxPercentage,
       transition_on_update: false,
       target: axes,
       x_label: histogram.description, y_label: "Percentage of Samples",
@@ -573,6 +604,7 @@ function displaySingleHistogramSet(axes, useTable, histograms, title, cumulative
       chart_type: "line",
       full_width: true, height: $(axes).width() * 0.6,
       left: 70,
+      max_y: maxPercentage,
       transition_on_update: false,
       target: axes,
       x_label: histograms[0].description, y_label: "Percentage of Samples",
